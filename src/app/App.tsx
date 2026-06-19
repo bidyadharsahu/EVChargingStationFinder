@@ -227,40 +227,72 @@ const CITY_FUEL_PRICES: Record<string, CityPrices> = {
   Bhopal:     { petrol: 108.65, diesel: 93.89, cng: 88.00, e20: 103.22, e85: 77.50,             evHome: 7.00, evACPublic: 9.00,  evDCFast: 18.00, updated: "Jun 2025" },
 };
 
+// ── Countries ─────────────────────────────────────────────────────────────────
+
+interface Country {
+  code: string; name: string; flag: string;
+  currency: string; symbol: string;
+  hasEthanol: boolean;
+  defaultCenter: [number, number]; defaultZoom: number;
+  fuelPrices: CityPrices;
+}
+
+const COUNTRIES: Country[] = [
+  { code: "IN", name: "India",         flag: "🇮🇳", currency: "INR", symbol: "₹",   hasEthanol: true,  defaultCenter: [22.0, 79.0],     defaultZoom: 5,  fuelPrices: { petrol: 94.72,  diesel: 87.62, cng: 76.59, e20: 89.94, e85: 70.50, e100: 65.00, evHome: 6.00,  evACPublic: 8.50,  evDCFast: 17.00, updated: "Jun 2025" } },
+  { code: "US", name: "United States", flag: "🇺🇸", currency: "USD", symbol: "$",   hasEthanol: false, defaultCenter: [38.0, -97.0],    defaultZoom: 4,  fuelPrices: { petrol: 0.95,   diesel: 0.89,               e20: 0.90,                            evHome: 0.13,  evACPublic: 0.33,  evDCFast: 0.44,  updated: "Jun 2025" } },
+  { code: "GB", name: "United Kingdom",flag: "🇬🇧", currency: "GBP", symbol: "£",   hasEthanol: false, defaultCenter: [54.0, -2.0],     defaultZoom: 5,  fuelPrices: { petrol: 1.42,   diesel: 1.49,                                                           evHome: 0.25,  evACPublic: 0.50,  evDCFast: 0.79,  updated: "Jun 2025" } },
+  { code: "DE", name: "Germany",       flag: "🇩🇪", currency: "EUR", symbol: "€",   hasEthanol: false, defaultCenter: [51.2, 10.4],     defaultZoom: 6,  fuelPrices: { petrol: 1.74,   diesel: 1.68,                                                           evHome: 0.31,  evACPublic: 0.49,  evDCFast: 0.79,  updated: "Jun 2025" } },
+  { code: "FR", name: "France",        flag: "🇫🇷", currency: "EUR", symbol: "€",   hasEthanol: false, defaultCenter: [46.2, 2.2],      defaultZoom: 6,  fuelPrices: { petrol: 1.79,   diesel: 1.75,                                                           evHome: 0.23,  evACPublic: 0.45,  evDCFast: 0.75,  updated: "Jun 2025" } },
+  { code: "JP", name: "Japan",         flag: "🇯🇵", currency: "JPY", symbol: "¥",   hasEthanol: false, defaultCenter: [36.2, 138.2],    defaultZoom: 5,  fuelPrices: { petrol: 175,    diesel: 152,                                                            evHome: 25,    evACPublic: 40,    evDCFast: 65,    updated: "Jun 2025" } },
+  { code: "AU", name: "Australia",     flag: "🇦🇺", currency: "AUD", symbol: "A$",  hasEthanol: false, defaultCenter: [-25.3, 133.8],   defaultZoom: 4,  fuelPrices: { petrol: 1.85,   diesel: 1.92,                                                           evHome: 0.28,  evACPublic: 0.52,  evDCFast: 0.65,  updated: "Jun 2025" } },
+  { code: "CN", name: "China",         flag: "🇨🇳", currency: "CNY", symbol: "¥",   hasEthanol: false, defaultCenter: [35.9, 104.2],    defaultZoom: 4,  fuelPrices: { petrol: 7.50,   diesel: 7.00,                                                           evHome: 0.60,  evACPublic: 1.20,  evDCFast: 1.80,  updated: "Jun 2025" } },
+  { code: "BR", name: "Brazil",        flag: "🇧🇷", currency: "BRL", symbol: "R$",  hasEthanol: true,  defaultCenter: [-14.2, -51.9],   defaultZoom: 4,  fuelPrices: { petrol: 6.00,   diesel: 5.70,               e20: 5.40, e85: 4.20, e100: 3.80,           evHome: 0.80,  evACPublic: 1.50,  evDCFast: 2.50,  updated: "Jun 2025" } },
+  { code: "CA", name: "Canada",        flag: "🇨🇦", currency: "CAD", symbol: "C$",  hasEthanol: false, defaultCenter: [56.1, -106.3],   defaultZoom: 4,  fuelPrices: { petrol: 1.65,   diesel: 1.55,                                                           evHome: 0.14,  evACPublic: 0.32,  evDCFast: 0.48,  updated: "Jun 2025" } },
+  { code: "NO", name: "Norway",        flag: "🇳🇴", currency: "NOK", symbol: "kr",  hasEthanol: false, defaultCenter: [60.5, 8.5],      defaultZoom: 5,  fuelPrices: { petrol: 19.50,  diesel: 18.80,                                                          evHome: 1.20,  evACPublic: 3.50,  evDCFast: 5.50,  updated: "Jun 2025" } },
+  { code: "NL", name: "Netherlands",   flag: "🇳🇱", currency: "EUR", symbol: "€",   hasEthanol: false, defaultCenter: [52.1, 5.3],      defaultZoom: 7,  fuelPrices: { petrol: 2.04,   diesel: 1.79,                                                           evHome: 0.35,  evACPublic: 0.55,  evDCFast: 0.89,  updated: "Jun 2025" } },
+  { code: "SG", name: "Singapore",     flag: "🇸🇬", currency: "SGD", symbol: "S$",  hasEthanol: false, defaultCenter: [1.35,  103.82],  defaultZoom: 11, fuelPrices: { petrol: 2.94,   diesel: 2.12,                                                           evHome: 0.30,  evACPublic: 0.55,  evDCFast: 0.80,  updated: "Jun 2025" } },
+  { code: "AE", name: "UAE",           flag: "🇦🇪", currency: "AED", symbol: "د.إ", hasEthanol: false, defaultCenter: [24.0, 54.0],     defaultZoom: 7,  fuelPrices: { petrol: 0.79,   diesel: 0.73,                                                           evHome: 0.08,  evACPublic: 0.25,  evDCFast: 0.45,  updated: "Jun 2025" } },
+  { code: "ZA", name: "South Africa",  flag: "🇿🇦", currency: "ZAR", symbol: "R",   hasEthanol: false, defaultCenter: [-28.5, 25.0],    defaultZoom: 5,  fuelPrices: { petrol: 24.18,  diesel: 22.73,                                                          evHome: 2.72,  evACPublic: 5.00,  evDCFast: 8.50,  updated: "Jun 2025" } },
+  { code: "KR", name: "South Korea",   flag: "🇰🇷", currency: "KRW", symbol: "₩",   hasEthanol: false, defaultCenter: [36.5, 127.5],    defaultZoom: 7,  fuelPrices: { petrol: 1680,   diesel: 1480,                                                           evHome: 100,   evACPublic: 250,   evDCFast: 420,   updated: "Jun 2025" } },
+];
+
+// ── Cheapest option ────────────────────────────────────────────────────────────
+
 interface CheapestOption { label: string; tag: string; icon: string; display: string; costPerKm: number; color: string; pct: number; }
 
-function computeCheapestPerKm(prices: CityPrices): CheapestOption[] {
+function computeCheapestPerKm(prices: CityPrices, sym: string): CheapestOption[] {
   const pm = 15;    // avg petrol car km/L
   const em = 6.5;  // avg EV km/kWh
   const petrolPerKm = prices.petrol / pm;
   const opts: Omit<CheapestOption, "pct">[] = [
-    { label: "EV Home",       tag: "evHome",  icon: "🏠", display: `₹${prices.evHome}/kWh`,      costPerKm: prices.evHome    / em,        color: "#C2FF3D" },
-    { label: "EV Public AC",  tag: "evAC",    icon: "⚡", display: `₹${prices.evACPublic}/kWh`,   costPerKm: prices.evACPublic / em,       color: "#C2FF3D" },
-    { label: "EV DC Fast",    tag: "evDC",    icon: "⚡", display: `₹${prices.evDCFast}/kWh`,     costPerKm: prices.evDCFast  / em,        color: "#3DBAFF" },
-    { label: "Diesel",        tag: "diesel",  icon: "🛢️", display: `₹${prices.diesel}/L`,         costPerKm: prices.diesel    / (pm * 1.25), color: "#7A828E" },
+    { label: "EV Home",       tag: "evHome",  icon: "🏠", display: `${sym}${prices.evHome}/kWh`,      costPerKm: prices.evHome    / em,          color: "#C2FF3D" },
+    { label: "EV Public AC",  tag: "evAC",    icon: "⚡", display: `${sym}${prices.evACPublic}/kWh`,   costPerKm: prices.evACPublic / em,         color: "#C2FF3D" },
+    { label: "EV DC Fast",    tag: "evDC",    icon: "⚡", display: `${sym}${prices.evDCFast}/kWh`,     costPerKm: prices.evDCFast  / em,          color: "#3DBAFF" },
+    { label: "Diesel",        tag: "diesel",  icon: "🛢️", display: `${sym}${prices.diesel}/L`,         costPerKm: prices.diesel    / (pm * 1.25), color: "#7A828E" },
   ];
-  if (prices.cng)  opts.push({ label: "CNG",         tag: "cng",  icon: "💨", display: `₹${prices.cng}/kg`,   costPerKm: prices.cng!  / 25,        color: "#22D3EE" });
-  if (prices.e100) opts.push({ label: "E100 Ethanol", tag: "e100", icon: "🌿", display: `₹${prices.e100}/L`,  costPerKm: prices.e100! / (pm * 0.72), color: "#15803D" });
-  if (prices.e85)  opts.push({ label: "E85 Flex-Fuel",tag: "e85",  icon: "🌿", display: `₹${prices.e85}/L`,   costPerKm: prices.e85!  / (pm * 0.90), color: "#16A34A" });
-  opts.push({ label: "E20 Blend",      tag: "e20",    icon: "🌿", display: `₹${prices.e20}/L`,    costPerKm: prices.e20   / (pm * 0.95), color: "#4ADE80" });
-  opts.push({ label: "Petrol",         tag: "petrol", icon: "⛽", display: `₹${prices.petrol}/L`, costPerKm: petrolPerKm,                 color: "#FF8A3D" });
+  if (prices.cng)  opts.push({ label: "CNG",          tag: "cng",  icon: "💨", display: `${sym}${prices.cng}/kg`,   costPerKm: prices.cng!  / 25,          color: "#22D3EE" });
+  if (prices.e100) opts.push({ label: "E100 Ethanol",  tag: "e100", icon: "🌿", display: `${sym}${prices.e100}/L`,  costPerKm: prices.e100! / (pm * 0.72), color: "#15803D" });
+  if (prices.e85)  opts.push({ label: "E85 Flex-Fuel", tag: "e85",  icon: "🌿", display: `${sym}${prices.e85}/L`,   costPerKm: prices.e85!  / (pm * 0.90), color: "#16A34A" });
+  if (prices.e20)  opts.push({ label: "E20 Blend",     tag: "e20",  icon: "🌿", display: `${sym}${prices.e20}/L`,   costPerKm: prices.e20   / (pm * 0.95), color: "#4ADE80" });
+  opts.push({ label: "Petrol", tag: "petrol", icon: "⛽", display: `${sym}${prices.petrol}/L`, costPerKm: petrolPerKm, color: "#FF8A3D" });
   opts.sort((a, b) => a.costPerKm - b.costPerKm);
   return opts.map(o => ({ ...o, pct: Math.round((1 - o.costPerKm / petrolPerKm) * 100) }));
 }
 
 // ── Price Ticker ──────────────────────────────────────────────────────────────
 
-function PriceTicker({ city, prices }: { city: string; prices: CityPrices }) {
+function PriceTicker({ city, prices, symbol }: { city: string; prices: CityPrices; symbol: string }) {
+  const s = symbol;
   const items: { label: string; val: string; col: string }[] = [
-    { label: "Petrol",     val: `₹${prices.petrol}/L`,        col: "#FF8A3D" },
-    { label: "Diesel",     val: `₹${prices.diesel}/L`,        col: "#7A828E" },
-    ...(prices.cng  ? [{ label: "CNG",      val: `₹${prices.cng}/kg`,      col: "#22D3EE" }] : []),
-    { label: "E20",        val: `₹${prices.e20}/L`,           col: "#4ADE80" },
-    ...(prices.e85  ? [{ label: "E85",      val: `₹${prices.e85}/L`,       col: "#16A34A" }] : []),
-    ...(prices.e100 ? [{ label: "E100",     val: `₹${prices.e100}/L`,      col: "#15803D" }] : []),
-    { label: "EV Home",    val: `₹${prices.evHome}/kWh`,      col: "#C2FF3D" },
-    { label: "EV AC",      val: `₹${prices.evACPublic}/kWh`,  col: "#C2FF3D" },
-    { label: "EV DC Fast", val: `₹${prices.evDCFast}/kWh`,    col: "#3DBAFF" },
+    { label: "Petrol",     val: `${s}${prices.petrol}/L`,        col: "#FF8A3D" },
+    { label: "Diesel",     val: `${s}${prices.diesel}/L`,        col: "#7A828E" },
+    ...(prices.cng  ? [{ label: "CNG",      val: `${s}${prices.cng}/kg`,      col: "#22D3EE" }] : []),
+    ...(prices.e20  ? [{ label: "E20",      val: `${s}${prices.e20}/L`,       col: "#4ADE80" }] : []),
+    ...(prices.e85  ? [{ label: "E85",      val: `${s}${prices.e85}/L`,       col: "#16A34A" }] : []),
+    ...(prices.e100 ? [{ label: "E100",     val: `${s}${prices.e100}/L`,      col: "#15803D" }] : []),
+    { label: "EV Home",    val: `${s}${prices.evHome}/kWh`,      col: "#C2FF3D" },
+    { label: "EV AC",      val: `${s}${prices.evACPublic}/kWh`,  col: "#C2FF3D" },
+    { label: "EV DC Fast", val: `${s}${prices.evDCFast}/kWh`,    col: "#3DBAFF" },
   ];
   const row = items.map((it, i) => (
     <span key={i} className="inline-flex items-center gap-2 mr-10 flex-shrink-0">
@@ -287,8 +319,8 @@ function PriceTicker({ city, prices }: { city: string; prices: CityPrices }) {
 
 // ── Cheapest Per Km Panel ─────────────────────────────────────────────────────
 
-function CheapestPerKmPanel({ city, prices }: { city: string; prices: CityPrices }) {
-  const ranked = computeCheapestPerKm(prices);
+function CheapestPerKmPanel({ city, prices, symbol }: { city: string; prices: CityPrices; symbol: string }) {
+  const ranked = computeCheapestPerKm(prices, symbol);
   const medals = ["🥇", "🥈", "🥉"];
   return (
     <div className="px-4 py-3 border-b border-border flex-shrink-0" style={{ background: "#0F1217" }}>
@@ -307,7 +339,7 @@ function CheapestPerKmPanel({ city, prices }: { city: string; prices: CityPrices
                 <div className="flex items-center justify-between gap-1 mb-0.5">
                   <span className="text-[10px] font-mono text-foreground truncate">{opt.icon} {opt.label}</span>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-[10px] font-mono font-bold" style={{ color: opt.color }}>₹{opt.costPerKm.toFixed(2)}/km</span>
+                    <span className="text-[10px] font-mono font-bold" style={{ color: opt.color }}>{symbol}{opt.costPerKm.toFixed(2)}/km</span>
                     {opt.pct > 0 && <span className="text-[9px] font-mono font-bold" style={{ color: isEV ? "#C2FF3D" : "#4ADE80" }}>↓{opt.pct}%</span>}
                   </div>
                 </div>
@@ -369,8 +401,9 @@ function getHighestBlend(blends: string[]): string {
 
 // ── API ────────────────────────────────────────────────────────────────────────
 
-async function fetchOCMStations(lat: number, lng: number, distKm: number): Promise<OCMStation[]> {
-  const url = `https://api.openchargemap.io/v3/poi/?output=json&latitude=${lat}&longitude=${lng}&distance=${distKm}&maxresults=100&distanceunit=KM&verbose=false`;
+async function fetchOCMStations(lat: number, lng: number, distKm: number, countryCode?: string): Promise<OCMStation[]> {
+  const cc = countryCode ? `&countrycode=${countryCode}` : "";
+  const url = `https://api.openchargemap.io/v3/poi/?output=json&latitude=${lat}&longitude=${lng}&distance=${distKm}&maxresults=100&distanceunit=KM&verbose=false${cc}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error("API error");
   const data = await res.json();
@@ -469,6 +502,9 @@ function SectionLabel({ eyebrow }: { eyebrow: string }) {
 export default function App() {
   // Mode
   const [fuelMode, setFuelMode] = useState<FuelMode>("ev");
+  const [selectedCountry, setSelectedCountry] = useState<Country>(COUNTRIES[0]); // India default
+  const [countryDropOpen, setCountryDropOpen] = useState(false);
+  const countryRef = useRef<HTMLDivElement>(null);
 
   // Core state
   const [step, setStep] = useState<AppStep>("initial");
@@ -521,7 +557,10 @@ export default function App() {
   const [selectedBlend, setSelectedBlend] = useState("E20");
 
   useEffect(() => {
-    const h = (e: MouseEvent) => { if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchFocus(false); };
+    const h = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchFocus(false);
+      if (countryRef.current && !countryRef.current.contains(e.target as Node)) setCountryDropOpen(false);
+    };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
@@ -606,9 +645,20 @@ export default function App() {
     }
   }, [fuelMode, evStations, connFilter, ethanolCity, blendFilter, userLoc]);
 
-  const loadEVStations = useCallback(async (lat: number, lng: number, dist: number) => {
+  const handleCountryChange = useCallback((country: Country) => {
+    setSelectedCountry(country);
+    setCountryDropOpen(false);
+    setMapAction({ lat: country.defaultCenter[0], lng: country.defaultCenter[1], zoom: country.defaultZoom });
+    setEvStations([]);
+    setStep("initial");
+    setConnFilter("All");
+    setCityQuery("");
+    if (!country.hasEthanol && fuelMode === "ethanol") setFuelMode("ev");
+  }, [fuelMode]);
+
+  const loadEVStations = useCallback(async (lat: number, lng: number, dist: number, cc?: string) => {
     setEvFetching(true);
-    try { setEvStations(await fetchOCMStations(lat, lng, dist)); }
+    try { setEvStations(await fetchOCMStations(lat, lng, dist, cc)); }
     catch { setEvStations([]); }
     finally { setEvFetching(false); }
   }, []);
@@ -622,7 +672,7 @@ export default function App() {
         setMapAction({ lat, lng, zoom: 14 });
         setStep("loaded");
         if (fuelMode === "ev") {
-          loadEVStations(lat, lng, distKm);
+          loadEVStations(lat, lng, distKm, selectedCountry.code);
         } else {
           if (isInIndia(lat, lng)) {
             const city = nearestEthCity(lat, lng);
@@ -674,7 +724,7 @@ export default function App() {
 
   const changeDistance = (km: number) => {
     setDistKm(km);
-    if (userLoc && step === "loaded" && fuelMode === "ev") loadEVStations(userLoc.lat, userLoc.lng, km);
+    if (userLoc && step === "loaded" && fuelMode === "ev") loadEVStations(userLoc.lat, userLoc.lng, km, selectedCountry.code);
   };
 
   const switchMode = (mode: FuelMode) => {
@@ -716,13 +766,14 @@ export default function App() {
 
   const showMap = step === "loaded" || step === "requesting" || fuelMode === "ethanol";
 
-  // Live price city — follows ethanol selection, falls back to locationLabel match, then Delhi
-  const priceCity = CITY_FUEL_PRICES[ethanolCity]
-    ? ethanolCity
-    : CITY_FUEL_PRICES[locationLabel]
-    ? locationLabel
-    : "Delhi";
-  const currentPrices = CITY_FUEL_PRICES[priceCity];
+  // Live price — city-level for India, country-level for others
+  const priceCity = selectedCountry.code === "IN"
+    ? (CITY_FUEL_PRICES[ethanolCity] ? ethanolCity : CITY_FUEL_PRICES[locationLabel] ? locationLabel : "Delhi")
+    : selectedCountry.name;
+  const currentPrices = selectedCountry.code === "IN"
+    ? (CITY_FUEL_PRICES[priceCity] || CITY_FUEL_PRICES["Delhi"])
+    : selectedCountry.fuelPrices;
+  const currencySymbol = selectedCountry.symbol;
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -771,6 +822,58 @@ export default function App() {
             <span className="hidden md:inline">{step === "requesting" ? "Locating…" : "My Location"}</span>
           </button>
 
+          {/* ── Country Selector ── */}
+          <div className="relative flex-shrink-0" ref={countryRef}>
+            <button
+              onClick={() => setCountryDropOpen((o) => !o)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-mono tracking-wider transition-all duration-200 hover:bg-white/5"
+              style={{ background: "#1A1E24", border: "1px solid rgba(194,255,61,0.15)", color: "#F3F1EA" }}
+              title="Select country"
+            >
+              <span className="text-base leading-none">{selectedCountry.flag}</span>
+              <span className="hidden sm:inline text-[11px]">{selectedCountry.name}</span>
+              <ChevronDown className="w-3 h-3 text-muted-foreground" />
+            </button>
+
+            <AnimatePresence>
+              {countryDropOpen && (
+                <motion.div
+                  className="absolute top-full right-0 mt-1 z-50 rounded-lg p-3"
+                  style={{ background: "#1A1E24", border: "1px solid rgba(194,255,61,0.15)", boxShadow: "0 12px 40px rgba(0,0,0,0.6)", width: 320 }}
+                  initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <div className="text-[9px] font-mono tracking-widest uppercase text-muted-foreground mb-3 px-1">Select your country</div>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {COUNTRIES.map((country) => {
+                      const active = selectedCountry.code === country.code;
+                      return (
+                        <button
+                          key={country.code}
+                          onClick={() => handleCountryChange(country)}
+                          className="flex flex-col items-center gap-1 px-2 py-2.5 rounded-md text-center transition-all duration-150 hover:bg-white/5"
+                          style={{
+                            background: active ? "rgba(194,255,61,0.08)" : "transparent",
+                            border: `1px solid ${active ? "rgba(194,255,61,0.35)" : "transparent"}`,
+                          }}
+                        >
+                          <span className="text-2xl leading-none">{country.flag}</span>
+                          <span className="text-[9px] font-mono text-muted-foreground leading-tight mt-0.5">{country.name.split(" ")[0]}</span>
+                          {country.hasEthanol && (
+                            <span className="text-[7px] font-mono font-bold" style={{ color: "#4ADE80" }}>+ Ethanol</span>
+                          )}
+                          <span className="text-[8px] font-mono" style={{ color: active ? "#C2FF3D" : "#7A828E" }}>{country.currency}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           <div className="hidden lg:flex items-center gap-4 ml-1">
             {["range", "ethanol", "cost", "connectors"].map((id) => (
               <a key={id} href={`#${id}`} className="text-[10px] font-mono tracking-[0.15em] uppercase text-muted-foreground hover:text-primary transition-colors">{id}</a>
@@ -783,7 +886,7 @@ export default function App() {
       <div id="stations" className="pt-14 flex flex-col" style={{ height: "calc(100vh - 56px)", minHeight: 520 }}>
 
         {/* ── Live Price Ticker (full width) ── */}
-        <PriceTicker city={priceCity} prices={currentPrices} />
+        <PriceTicker city={priceCity} prices={currentPrices} symbol={currencySymbol} />
 
         {/* ── Left Panel + Map row ── */}
         <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
@@ -793,14 +896,25 @@ export default function App() {
 
           {/* Mode toggle tabs */}
           <div className="flex border-b border-border flex-shrink-0">
-            <button onClick={() => switchMode("ev")} className="flex-1 flex items-center justify-center gap-2 py-3 text-xs font-mono uppercase tracking-wider transition-all duration-200 border-r border-border" style={{ background: fuelMode === "ev" ? "rgba(194,255,61,0.07)" : "transparent", color: fuelMode === "ev" ? "#C2FF3D" : "#7A828E", borderBottom: fuelMode === "ev" ? "2px solid #C2FF3D" : "2px solid transparent" }}>
+            <button
+              onClick={() => switchMode("ev")}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-mono uppercase tracking-wider transition-all duration-200 ${selectedCountry.hasEthanol ? "border-r border-border" : ""}`}
+              style={{ background: fuelMode === "ev" ? "rgba(194,255,61,0.07)" : "transparent", color: fuelMode === "ev" ? "#C2FF3D" : "#7A828E", borderBottom: fuelMode === "ev" ? "2px solid #C2FF3D" : "2px solid transparent" }}
+            >
               <Zap className="w-3.5 h-3.5" />
               EV Chargers
+              <span className="text-[9px] font-mono opacity-60 hidden sm:inline">{selectedCountry.flag}</span>
             </button>
-            <button onClick={() => switchMode("ethanol")} className="flex-1 flex items-center justify-center gap-2 py-3 text-xs font-mono uppercase tracking-wider transition-all duration-200" style={{ background: fuelMode === "ethanol" ? "rgba(74,222,128,0.07)" : "transparent", color: fuelMode === "ethanol" ? "#4ADE80" : "#7A828E", borderBottom: fuelMode === "ethanol" ? "2px solid #4ADE80" : "2px solid transparent" }}>
-              <Leaf className="w-3.5 h-3.5" />
-              Ethanol India
-            </button>
+            {selectedCountry.hasEthanol && (
+              <button
+                onClick={() => switchMode("ethanol")}
+                className="flex-1 flex items-center justify-center gap-2 py-3 text-xs font-mono uppercase tracking-wider transition-all duration-200"
+                style={{ background: fuelMode === "ethanol" ? "rgba(74,222,128,0.07)" : "transparent", color: fuelMode === "ethanol" ? "#4ADE80" : "#7A828E", borderBottom: fuelMode === "ethanol" ? "2px solid #4ADE80" : "2px solid transparent" }}
+              >
+                <Leaf className="w-3.5 h-3.5" />
+                Ethanol {selectedCountry.code === "IN" ? "India" : selectedCountry.name}
+              </button>
+            )}
           </div>
 
           {/* Panel header */}
@@ -821,7 +935,7 @@ export default function App() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {evFetching ? <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" /> : <button onClick={() => userLoc && loadEVStations(userLoc.lat, userLoc.lng, distKm)} className="p-1.5 rounded hover:bg-white/5"><RefreshCw className="w-3.5 h-3.5 text-muted-foreground hover:text-primary" /></button>}
+                    {evFetching ? <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" /> : <button onClick={() => userLoc && loadEVStations(userLoc.lat, userLoc.lng, distKm, selectedCountry.code)} className="p-1.5 rounded hover:bg-white/5"><RefreshCw className="w-3.5 h-3.5 text-muted-foreground hover:text-primary" /></button>}
                     <span className="text-[11px] font-mono text-primary font-medium">{filteredEV.length}</span>
                   </div>
                 </div>
@@ -884,7 +998,7 @@ export default function App() {
           </div>
 
           {/* Cheapest per km panel */}
-          <CheapestPerKmPanel city={priceCity} prices={currentPrices} />
+          <CheapestPerKmPanel city={priceCity} prices={currentPrices} symbol={currencySymbol} />
 
           {/* Station / pump list */}
           <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: "thin", scrollbarColor: "#C2FF3D20 transparent" }}>

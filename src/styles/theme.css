@@ -119,6 +119,11 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
 @keyframes ev-pulse {
   0% { transform: scale(1); opacity: 0.7; }
   70%, 100% { transform: scale(2.8); opacity: 0; }
@@ -138,45 +143,53 @@
     font-family: 'Chakra Petch', sans-serif;
   }
 
-  /* ── Leaflet dark theme overrides ── */
-  .leaflet-popup-content-wrapper {
+  /* ── MapLibre GL dark theme overrides ── */
+  .maplibregl-popup-content {
     background: #1A1E24 !important;
     border: 1px solid rgba(194,255,61,0.18) !important;
     border-radius: 8px !important;
     box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
     color: #F3F1EA !important;
     padding: 0 !important;
+    font-family: 'DM Sans', sans-serif !important;
   }
-  .leaflet-popup-content {
-    margin: 0 !important;
-  }
-  .leaflet-popup-tip-container {
+  .maplibregl-popup-tip {
     display: none !important;
   }
-  .leaflet-popup-close-button {
+  .maplibregl-popup-close-button {
     color: #7A828E !important;
-    top: 8px !important;
-    right: 10px !important;
     font-size: 18px !important;
+    padding: 4px 8px !important;
+    line-height: 1 !important;
   }
-  .leaflet-bar a {
-    background: #1A1E24 !important;
-    border-color: rgba(194,255,61,0.15) !important;
+  .maplibregl-popup-close-button:hover {
+    background: transparent !important;
     color: #F3F1EA !important;
   }
-  .leaflet-bar a:hover {
-    background: #1F242C !important;
-  }
-  .leaflet-control-attribution {
+  .maplibregl-ctrl-attrib {
     background: rgba(13,16,23,0.75) !important;
     color: #7A828E !important;
     font-size: 10px !important;
   }
-  .leaflet-control-attribution a {
+  .maplibregl-ctrl-attrib a {
     color: #C2FF3D !important;
   }
-  .leaflet-container {
-    font-family: 'DM Sans', sans-serif !important;
+  .maplibregl-ctrl-zoom-in, .maplibregl-ctrl-zoom-out, .maplibregl-ctrl-compass {
+    background-color: #1A1E24 !important;
+    border-color: rgba(194,255,61,0.15) !important;
+    color: #F3F1EA !important;
+  }
+  .maplibregl-ctrl-zoom-in:hover, .maplibregl-ctrl-zoom-out:hover {
+    background-color: #1F242C !important;
+  }
+  .maplibregl-ctrl-group {
+    background: #1A1E24 !important;
+    border: 1px solid rgba(194,255,61,0.15) !important;
+    border-radius: 6px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+  }
+  .maplibregl-canvas {
+    outline: none;
   }
   /* Range slider thumb */
   input[type="range"]::-webkit-slider-thumb {

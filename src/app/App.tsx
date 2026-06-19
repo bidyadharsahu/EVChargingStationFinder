@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import {
   MapPin, Zap, Search, Navigation, X, RefreshCw, ChevronDown,
   ExternalLink, AlertCircle, Loader2, Leaf,
@@ -201,6 +201,129 @@ const CONNECTORS_GUIDE = [
   { id: "NACS", name: "NACS", fullName: "North American Charging Standard", speed: "Up to 350 kW DC", regions: "North America · expanding", color: "#C2FF3D", icon: "✦", description: "Originally Tesla-proprietary, open-sourced 2022, now adopted by Ford, GM, Rivian, Mercedes, Honda, and Nissan. One slim connector handles both AC and DC. Rapidly becoming the de-facto US standard." },
 ];
 
+// ── India Live Fuel Prices ────────────────────────────────────────────────────
+
+interface CityPrices {
+  petrol: number; diesel: number; cng?: number;
+  e20: number; e85?: number; e100?: number;
+  evHome: number; evACPublic: number; evDCFast: number;
+  updated: string;
+}
+
+const CITY_FUEL_PRICES: Record<string, CityPrices> = {
+  Delhi:      { petrol: 94.72,  diesel: 87.62, cng: 76.59, e20: 89.94, e85: 70.50, e100: 65.00, evHome: 6.00, evACPublic: 8.50,  evDCFast: 17.00, updated: "Jun 2025" },
+  Mumbai:     { petrol: 103.44, diesel: 89.97, cng: 88.50, e20: 98.27, e85: 75.20,              evHome: 7.00, evACPublic: 9.00,  evDCFast: 18.00, updated: "Jun 2025" },
+  Bangalore:  { petrol: 102.86, diesel: 88.94, cng: 80.00, e20: 97.72, e85: 73.50,              evHome: 6.50, evACPublic: 8.00,  evDCFast: 16.00, updated: "Jun 2025" },
+  Chennai:    { petrol: 100.73, diesel: 86.31, cng: 75.00, e20: 95.69, e85: 71.00,              evHome: 6.00, evACPublic: 8.50,  evDCFast: 17.00, updated: "Jun 2025" },
+  Pune:       { petrol: 104.18, diesel: 90.73, cng: 85.00, e20: 98.97, e85: 74.50, e100: 67.00, evHome: 7.00, evACPublic: 9.00,  evDCFast: 18.00, updated: "Jun 2025" },
+  Hyderabad:  { petrol: 107.36, diesel: 95.65, cng: 90.00, e20: 102.00, e85: 77.00,             evHome: 6.50, evACPublic: 9.00,  evDCFast: 18.00, updated: "Jun 2025" },
+  Kolkata:    { petrol: 103.94, diesel: 90.76, cng: 82.00, e20: 98.74, e85: 74.00,              evHome: 6.00, evACPublic: 8.50,  evDCFast: 17.00, updated: "Jun 2025" },
+  Ahmedabad:  { petrol: 96.63,  diesel: 92.38, cng: 79.00, e20: 91.80, e85: 69.00,              evHome: 5.50, evACPublic: 8.00,  evDCFast: 16.00, updated: "Jun 2025" },
+  Lucknow:    { petrol: 94.56,  diesel: 87.74, cng: 77.00, e20: 89.83, e85: 70.00, e100: 65.00, evHome: 6.00, evACPublic: 8.50,  evDCFast: 17.00, updated: "Jun 2025" },
+  Jaipur:     { petrol: 104.72, diesel: 90.22, cng: 76.00, e20: 99.48, e85: 74.50,              evHome: 6.00, evACPublic: 8.50,  evDCFast: 17.00, updated: "Jun 2025" },
+  Chandigarh: { petrol: 94.24,  diesel: 82.40, cng: 74.00, e20: 89.53, e85: 69.50,              evHome: 5.50, evACPublic: 8.00,  evDCFast: 16.00, updated: "Jun 2025" },
+  Nagpur:     { petrol: 104.18, diesel: 90.73, cng: 85.00, e20: 98.97, e85: 74.50,              evHome: 7.00, evACPublic: 9.00,  evDCFast: 18.00, updated: "Jun 2025" },
+  Indore:     { petrol: 108.65, diesel: 93.89, cng: 88.00, e20: 103.22, e85: 77.50,             evHome: 7.00, evACPublic: 9.00,  evDCFast: 18.00, updated: "Jun 2025" },
+  Bhopal:     { petrol: 108.65, diesel: 93.89, cng: 88.00, e20: 103.22, e85: 77.50,             evHome: 7.00, evACPublic: 9.00,  evDCFast: 18.00, updated: "Jun 2025" },
+};
+
+interface CheapestOption { label: string; tag: string; icon: string; display: string; costPerKm: number; color: string; pct: number; }
+
+function computeCheapestPerKm(prices: CityPrices): CheapestOption[] {
+  const pm = 15;    // avg petrol car km/L
+  const em = 6.5;  // avg EV km/kWh
+  const petrolPerKm = prices.petrol / pm;
+  const opts: Omit<CheapestOption, "pct">[] = [
+    { label: "EV Home",       tag: "evHome",  icon: "🏠", display: `₹${prices.evHome}/kWh`,      costPerKm: prices.evHome    / em,        color: "#C2FF3D" },
+    { label: "EV Public AC",  tag: "evAC",    icon: "⚡", display: `₹${prices.evACPublic}/kWh`,   costPerKm: prices.evACPublic / em,       color: "#C2FF3D" },
+    { label: "EV DC Fast",    tag: "evDC",    icon: "⚡", display: `₹${prices.evDCFast}/kWh`,     costPerKm: prices.evDCFast  / em,        color: "#3DBAFF" },
+    { label: "Diesel",        tag: "diesel",  icon: "🛢️", display: `₹${prices.diesel}/L`,         costPerKm: prices.diesel    / (pm * 1.25), color: "#7A828E" },
+  ];
+  if (prices.cng)  opts.push({ label: "CNG",         tag: "cng",  icon: "💨", display: `₹${prices.cng}/kg`,   costPerKm: prices.cng!  / 25,        color: "#22D3EE" });
+  if (prices.e100) opts.push({ label: "E100 Ethanol", tag: "e100", icon: "🌿", display: `₹${prices.e100}/L`,  costPerKm: prices.e100! / (pm * 0.72), color: "#15803D" });
+  if (prices.e85)  opts.push({ label: "E85 Flex-Fuel",tag: "e85",  icon: "🌿", display: `₹${prices.e85}/L`,   costPerKm: prices.e85!  / (pm * 0.90), color: "#16A34A" });
+  opts.push({ label: "E20 Blend",      tag: "e20",    icon: "🌿", display: `₹${prices.e20}/L`,    costPerKm: prices.e20   / (pm * 0.95), color: "#4ADE80" });
+  opts.push({ label: "Petrol",         tag: "petrol", icon: "⛽", display: `₹${prices.petrol}/L`, costPerKm: petrolPerKm,                 color: "#FF8A3D" });
+  opts.sort((a, b) => a.costPerKm - b.costPerKm);
+  return opts.map(o => ({ ...o, pct: Math.round((1 - o.costPerKm / petrolPerKm) * 100) }));
+}
+
+// ── Price Ticker ──────────────────────────────────────────────────────────────
+
+function PriceTicker({ city, prices }: { city: string; prices: CityPrices }) {
+  const items: { label: string; val: string; col: string }[] = [
+    { label: "Petrol",     val: `₹${prices.petrol}/L`,        col: "#FF8A3D" },
+    { label: "Diesel",     val: `₹${prices.diesel}/L`,        col: "#7A828E" },
+    ...(prices.cng  ? [{ label: "CNG",      val: `₹${prices.cng}/kg`,      col: "#22D3EE" }] : []),
+    { label: "E20",        val: `₹${prices.e20}/L`,           col: "#4ADE80" },
+    ...(prices.e85  ? [{ label: "E85",      val: `₹${prices.e85}/L`,       col: "#16A34A" }] : []),
+    ...(prices.e100 ? [{ label: "E100",     val: `₹${prices.e100}/L`,      col: "#15803D" }] : []),
+    { label: "EV Home",    val: `₹${prices.evHome}/kWh`,      col: "#C2FF3D" },
+    { label: "EV AC",      val: `₹${prices.evACPublic}/kWh`,  col: "#C2FF3D" },
+    { label: "EV DC Fast", val: `₹${prices.evDCFast}/kWh`,    col: "#3DBAFF" },
+  ];
+  const row = items.map((it, i) => (
+    <span key={i} className="inline-flex items-center gap-2 mr-10 flex-shrink-0">
+      <span className="text-[9px] font-mono text-muted-foreground tracking-wider">{it.label}</span>
+      <span className="text-[11px] font-mono font-bold" style={{ color: it.col }}>{it.val}</span>
+    </span>
+  ));
+  return (
+    <div className="flex items-center gap-3 px-4 border-b border-border overflow-hidden flex-shrink-0" style={{ height: 36, background: "#0F1217" }}>
+      <div className="flex items-center gap-1.5 flex-shrink-0 pr-3 border-r border-border">
+        <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#4ADE80" }} />
+        <span className="text-[9px] font-mono font-bold tracking-widest uppercase" style={{ color: "#4ADE80" }}>LIVE</span>
+        <span className="text-[9px] font-mono text-muted-foreground ml-2">{city}</span>
+      </div>
+      <div className="flex-1 overflow-hidden" style={{ maskImage: "linear-gradient(to right, transparent, black 5%, black 95%, transparent)" }}>
+        <div className="flex" style={{ animation: "ticker-scroll 28s linear infinite", willChange: "transform" }}>
+          {row}{row}
+        </div>
+      </div>
+      <span className="text-[9px] font-mono text-muted-foreground flex-shrink-0 hidden sm:block">{prices.updated}</span>
+    </div>
+  );
+}
+
+// ── Cheapest Per Km Panel ─────────────────────────────────────────────────────
+
+function CheapestPerKmPanel({ city, prices }: { city: string; prices: CityPrices }) {
+  const ranked = computeCheapestPerKm(prices);
+  const medals = ["🥇", "🥈", "🥉"];
+  return (
+    <div className="px-4 py-3 border-b border-border flex-shrink-0" style={{ background: "#0F1217" }}>
+      <div className="flex items-center justify-between mb-2.5">
+        <span className="text-[9px] font-mono font-bold tracking-widest uppercase" style={{ color: "#C2FF3D" }}>💰 Cheapest per km — {city}</span>
+        <span className="text-[9px] font-mono text-muted-foreground">15 km/L avg car</span>
+      </div>
+      <div className="space-y-1.5">
+        {ranked.slice(0, 6).map((opt, i) => {
+          const isEV = opt.tag.startsWith("ev");
+          const bar = Math.round((1 - opt.costPerKm / (ranked[ranked.length - 1].costPerKm)) * 100);
+          return (
+            <div key={opt.tag} className="flex items-center gap-2">
+              <span className="text-[10px] w-5 flex-shrink-0 text-center">{medals[i] || `${i + 1}.`}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-1 mb-0.5">
+                  <span className="text-[10px] font-mono text-foreground truncate">{opt.icon} {opt.label}</span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-[10px] font-mono font-bold" style={{ color: opt.color }}>₹{opt.costPerKm.toFixed(2)}/km</span>
+                    {opt.pct > 0 && <span className="text-[9px] font-mono font-bold" style={{ color: isEV ? "#C2FF3D" : "#4ADE80" }}>↓{opt.pct}%</span>}
+                  </div>
+                </div>
+                <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.05)" }}>
+                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(bar, 8)}%`, background: opt.color, opacity: 0.7 }} />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-2 text-[9px] font-mono text-muted-foreground/50">EV: 6.5 km/kWh avg · CNG: 25 km/kg · Diesel: 18.75 km/L</div>
+    </div>
+  );
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -270,34 +393,31 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
 
 // ── Leaflet icons ──────────────────────────────────────────────────────────────
 
-const BOLT = `<svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:#000;display:block"><path d="M13 2L4.09 12.96H11L11 22L19.91 11.04H13L13 2Z"/></svg>`;
-
-function makeEVIcon(color: string, operational: boolean, active = false) {
-  const bg = operational ? color : "#52575E";
-  const size = active ? 30 : 24;
-  const ring = active ? `box-shadow:0 0 0 4px ${color}55,0 2px 10px rgba(0,0,0,0.5)` : `box-shadow:0 0 0 2px ${color}33,0 2px 6px rgba(0,0,0,0.4)`;
-  return L.divIcon({ html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};border:2.5px solid rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;${ring}">${BOLT}</div>`, className: "", iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -(size / 2 + 4)] });
-}
-
+const BOLT_HTML = `<svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:#000;display:block"><path d="M13 2L4.09 12.96H11L11 22L19.91 11.04H13L13 2Z"/></svg>`;
 const BLEND_COLORS: Record<string, string> = { E20: "#4ADE80", E50: "#22C55E", E85: "#16A34A", E100: "#15803D", E10: "#86EFAC" };
 
-function makeEthanolIcon(primaryBlend: string, active = false) {
-  const col = BLEND_COLORS[primaryBlend] || "#22C55E";
-  const size = active ? 34 : 28;
-  const label = primaryBlend.replace("E", "");
-  return L.divIcon({
-    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${col};border:2.5px solid rgba(255,255,255,0.9);display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 0 0 3px ${col}44,0 2px 8px rgba(0,0,0,0.45);gap:0">
-      <span style="font-size:${size > 30 ? 9 : 7}px;font-weight:900;color:#064e3b;font-family:monospace;line-height:1;letter-spacing:-0.5px">E</span>
-      <span style="font-size:${size > 30 ? 8 : 6}px;font-weight:900;color:#064e3b;font-family:monospace;line-height:1">${label}</span>
-    </div>`,
-    className: "", iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -(size / 2 + 4)],
-  });
+function makeEVMarkerEl(color: string, operational: boolean): HTMLElement {
+  const el = document.createElement("div");
+  el.style.cssText = `width:24px;height:24px;border-radius:50%;background:${operational ? color : "#52575E"};border:2.5px solid rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px ${color}33,0 2px 6px rgba(0,0,0,0.4);cursor:pointer;`;
+  el.innerHTML = BOLT_HTML;
+  return el;
 }
 
-const userLocationIcon = L.divIcon({
-  html: `<div style="position:relative;width:20px;height:20px"><div style="position:absolute;inset:-5px;border-radius:50%;background:rgba(66,133,244,0.25);animation:ev-pulse 2s cubic-bezier(0,0,0.2,1) infinite"></div><div style="width:20px;height:20px;border-radius:50%;background:#4285F4;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4)"></div></div>`,
-  className: "", iconSize: [20, 20], iconAnchor: [10, 10],
-});
+function makeEthanolMarkerEl(primaryBlend: string): HTMLElement {
+  const col = BLEND_COLORS[primaryBlend] || "#22C55E";
+  const label = primaryBlend.replace("E", "");
+  const el = document.createElement("div");
+  el.style.cssText = `width:28px;height:28px;border-radius:50%;background:${col};border:2.5px solid rgba(255,255,255,0.9);display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 0 0 3px ${col}44,0 2px 8px rgba(0,0,0,0.45);cursor:pointer;gap:0;`;
+  el.innerHTML = `<span style="font-size:7px;font-weight:900;color:#064e3b;font-family:monospace;line-height:1;letter-spacing:-0.5px">E</span><span style="font-size:6px;font-weight:900;color:#064e3b;font-family:monospace;line-height:1">${label}</span>`;
+  return el;
+}
+
+function makeUserMarkerEl(): HTMLElement {
+  const el = document.createElement("div");
+  el.style.cssText = "position:relative;width:20px;height:20px;";
+  el.innerHTML = `<div style="position:absolute;inset:-5px;border-radius:50%;background:rgba(66,133,244,0.25);animation:ev-pulse 2s cubic-bezier(0,0,0.2,1) infinite;"></div><div style="width:20px;height:20px;border-radius:50%;background:#4285F4;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div>`;
+  return el;
+}
 
 // ── Popup HTML builders (used with raw Leaflet, no react-leaflet) ─────────────
 
@@ -375,11 +495,11 @@ export default function App() {
   const searchRef = useRef<HTMLDivElement>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Raw Leaflet refs (no react-leaflet)
+  // MapLibre GL refs
   const mapDivRef = useRef<HTMLDivElement>(null);
-  const leafletRef = useRef<L.Map | null>(null);
-  const stationMarkersRef = useRef<L.Marker[]>([]);
-  const userMarkerRef = useRef<L.Marker | null>(null);
+  const leafletRef = useRef<maplibregl.Map | null>(null);
+  const stationMarkersRef = useRef<maplibregl.Marker[]>([]);
+  const userMarkerRef = useRef<maplibregl.Marker | null>(null);
 
   // Range calc
   const [model, setModel] = useState(EV_MODELS[0]);
@@ -420,14 +540,16 @@ export default function App() {
     return base;
   })();
 
-  // Initialise Leaflet map once
+  // Initialise MapLibre GL map once
   useEffect(() => {
     if (!mapDivRef.current || leafletRef.current) return;
-    const map = L.map(mapDivRef.current, { center: [20, 78], zoom: 4, zoomControl: true });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      subdomains: "abcd", maxZoom: 19,
-    }).addTo(map);
+    const map = new maplibregl.Map({
+      container: mapDivRef.current,
+      style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+      center: [78, 20],
+      zoom: 4,
+      attributionControl: true,
+    });
     leafletRef.current = map;
     return () => { map.remove(); leafletRef.current = null; };
   }, []);
@@ -435,44 +557,49 @@ export default function App() {
   // Fly to location when mapAction changes
   useEffect(() => {
     if (mapAction && leafletRef.current) {
-      leafletRef.current.flyTo([mapAction.lat, mapAction.lng], mapAction.zoom ?? 14, { animate: true, duration: 1.0 });
+      leafletRef.current.flyTo({ center: [mapAction.lng, mapAction.lat], zoom: mapAction.zoom ?? 14, duration: 1000, essential: true });
     }
   }, [mapAction]);
 
   // User location marker
   useEffect(() => {
-    if (!leafletRef.current) return;
-    userMarkerRef.current?.remove();
-    userMarkerRef.current = null;
-    if (!userLoc) return;
-    userMarkerRef.current = L.marker([userLoc.lat, userLoc.lng], { icon: userLocationIcon })
-      .bindPopup(`<div style="font-family:'DM Sans',sans-serif;padding:10px 14px"><div style="font-weight:600;font-size:12px;color:#F3F1EA">📍 Your Location</div><div style="font-size:10px;color:#7A828E;margin-top:2px">${locationLabel}</div></div>`)
+    if (userMarkerRef.current) { userMarkerRef.current.remove(); userMarkerRef.current = null; }
+    if (!userLoc || !leafletRef.current) return;
+    const popup = new maplibregl.Popup({ offset: 12, maxWidth: "220px" })
+      .setHTML(`<div style="font-family:'DM Sans',sans-serif;padding:10px 14px"><div style="font-weight:600;font-size:12px;color:#F3F1EA">📍 Your Location</div><div style="font-size:10px;color:#7A828E;margin-top:2px">${locationLabel}</div></div>`);
+    userMarkerRef.current = new maplibregl.Marker({ element: makeUserMarkerEl() })
+      .setLngLat([userLoc.lng, userLoc.lat])
+      .setPopup(popup)
       .addTo(leafletRef.current);
   }, [userLoc, locationLabel]);
 
   // Station markers — re-render whenever stations or mode changes
   useEffect(() => {
-    if (!leafletRef.current) return;
-    stationMarkersRef.current.forEach(m => m.remove());
+    stationMarkersRef.current.forEach((m) => m.remove());
     stationMarkersRef.current = [];
+    if (!leafletRef.current) return;
     const map = leafletRef.current;
     if (fuelMode === "ev") {
-      filteredEV.forEach(s => {
+      filteredEV.forEach((s) => {
         const col = CONNECTOR_COLORS[getConnectors(s)[0]] || "#C2FF3D";
-        const icon = makeEVIcon(col, isOperational(s), false);
-        const m = L.marker([s.AddressInfo.Latitude, s.AddressInfo.Longitude], { icon })
-          .bindPopup(evPopupHTML(s), { maxWidth: 280 })
-          .on("click", () => setActiveEVStation(s.ID))
+        const el = makeEVMarkerEl(col, isOperational(s));
+        const popup = new maplibregl.Popup({ offset: 14, maxWidth: "280px" }).setHTML(evPopupHTML(s));
+        el.addEventListener("click", () => setActiveEVStation(s.ID));
+        const m = new maplibregl.Marker({ element: el })
+          .setLngLat([s.AddressInfo.Longitude, s.AddressInfo.Latitude])
+          .setPopup(popup)
           .addTo(map);
         stationMarkersRef.current.push(m);
       });
     } else {
-      filteredEth.forEach(s => {
+      filteredEth.forEach((s) => {
         const high = getHighestBlend(s.blends);
-        const icon = makeEthanolIcon(high, false);
-        const m = L.marker([s.lat, s.lng], { icon })
-          .bindPopup(ethPopupHTML(s), { maxWidth: 280 })
-          .on("click", () => setActiveEthStation(s.id))
+        const el = makeEthanolMarkerEl(high);
+        const popup = new maplibregl.Popup({ offset: 16, maxWidth: "280px" }).setHTML(ethPopupHTML(s));
+        el.addEventListener("click", () => setActiveEthStation(s.id));
+        const m = new maplibregl.Marker({ element: el })
+          .setLngLat([s.lng, s.lat])
+          .setPopup(popup)
           .addTo(map);
         stationMarkersRef.current.push(m);
       });
@@ -589,6 +716,14 @@ export default function App() {
 
   const showMap = step === "loaded" || step === "requesting" || fuelMode === "ethanol";
 
+  // Live price city — follows ethanol selection, falls back to locationLabel match, then Delhi
+  const priceCity = CITY_FUEL_PRICES[ethanolCity]
+    ? ethanolCity
+    : CITY_FUEL_PRICES[locationLabel]
+    ? locationLabel
+    : "Delhi";
+  const currentPrices = CITY_FUEL_PRICES[priceCity];
+
   return (
     <div className="min-h-screen bg-background text-foreground">
 
@@ -645,7 +780,13 @@ export default function App() {
       </nav>
 
       {/* ══════════════════ MAP SECTION ══════════════════ */}
-      <div id="stations" className="pt-14 flex flex-col lg:flex-row" style={{ height: "calc(100vh - 56px)", minHeight: 520 }}>
+      <div id="stations" className="pt-14 flex flex-col" style={{ height: "calc(100vh - 56px)", minHeight: 520 }}>
+
+        {/* ── Live Price Ticker (full width) ── */}
+        <PriceTicker city={priceCity} prices={currentPrices} />
+
+        {/* ── Left Panel + Map row ── */}
+        <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
 
         {/* ── Left Panel ── */}
         <div className="flex flex-col bg-background border-r border-border w-full h-[46vh] lg:w-[390px] lg:h-auto lg:flex-none overflow-hidden">
@@ -742,6 +883,9 @@ export default function App() {
             )}
           </div>
 
+          {/* Cheapest per km panel */}
+          <CheapestPerKmPanel city={priceCity} prices={currentPrices} />
+
           {/* Station / pump list */}
           <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: "thin", scrollbarColor: "#C2FF3D20 transparent" }}>
             {fuelMode === "ev" ? (
@@ -792,14 +936,22 @@ export default function App() {
                     const conns = getConnectors(s); const power = getMaxPower(s);
                     const op = isOperational(s); const dist = fmtDist(s.AddressInfo.Distance);
                     const col = CONNECTOR_COLORS[conns[0]] || "#C2FF3D"; const isAct = activeEVStation === s.ID;
+                    const pts = s.NumberOfPoints ?? 0;
+                    const isPopular = pts >= 4;
+                    // Estimate charging price from power level
+                    const estPriceKwh = power >= 100 ? currentPrices.evDCFast : power >= 22 ? currentPrices.evACPublic : currentPrices.evHome;
+                    const priceStr = s.UsageCost && s.UsageCost.length < 20 ? s.UsageCost : `~₹${estPriceKwh}/kWh`;
                     return (
                       <motion.div key={s.ID} className="px-4 py-3 border-b border-border cursor-pointer transition-all duration-150" style={{ background: isAct ? "#1A1E24" : "transparent" }}
                         onClick={() => { setActiveEVStation(s.ID); setMapAction({ lat: s.AddressInfo.Latitude, lng: s.AddressInfo.Longitude, zoom: 16 }); }}
                         onMouseEnter={() => setActiveEVStation(s.ID)} onMouseLeave={() => setActiveEVStation(null)}
                         initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ delay: Math.min(i * 0.025, 0.25), duration: 0.25 }}>
                         <div className="flex items-start gap-3">
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: op ? col + "18" : "#52575E18", border: `1.5px solid ${op ? col + "40" : "#52575E40"}` }}>
-                            <Zap className="w-3.5 h-3.5" style={{ color: op ? col : "#52575E" }} strokeWidth={2.5} />
+                          <div className="relative flex-shrink-0 mt-0.5">
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: op ? col + "18" : "#52575E18", border: `1.5px solid ${op ? col + "40" : "#52575E40"}` }}>
+                              <Zap className="w-3.5 h-3.5" style={{ color: op ? col : "#52575E" }} strokeWidth={2.5} />
+                            </div>
+                            {isPopular && <span className="absolute -top-1 -right-1 text-[7px] leading-none px-1 py-0.5 rounded-full font-bold font-mono" style={{ background: "#FF8A3D", color: "#fff" }}>🔥</span>}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-1">
@@ -809,12 +961,16 @@ export default function App() {
                             {s.AddressInfo.Town && <div className="text-[10px] text-muted-foreground mt-0.5 truncate">{[s.AddressInfo.AddressLine1, s.AddressInfo.Town].filter(Boolean).join(", ")}</div>}
                             <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                               {conns.slice(0, 3).map((c) => <ConnectorBadge key={c} type={c} />)}
-                              {power > 0 && <span className="text-[10px] font-mono text-muted-foreground ml-auto">{power}kW</span>}
+                              {power > 0 && <span className="text-[10px] font-mono text-muted-foreground">{power}kW</span>}
+                              <span className="text-[10px] font-mono ml-auto font-bold" style={{ color: "#C2FF3D" }}>{priceStr}</span>
                             </div>
                             <div className="flex items-center justify-between mt-1.5">
-                              <div className="flex items-center gap-1.5">
-                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: op ? "#C2FF3D" : "#FF4D4D" }} />
-                                <span className="text-[10px] font-mono" style={{ color: op ? "#C2FF3D" : "#FF4D4D" }}>{op ? "Operational" : "Unavailable"}</span>
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: op ? "#C2FF3D" : "#FF4D4D" }} />
+                                  <span className="text-[10px] font-mono" style={{ color: op ? "#C2FF3D" : "#FF4D4D" }}>{op ? "Operational" : "Unavailable"}</span>
+                                </div>
+                                {isPopular && <span className="text-[9px] font-mono text-orange-400">{pts} points · Popular</span>}
                               </div>
                               <a href={mapsUrl(s.AddressInfo.Latitude, s.AddressInfo.Longitude)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-[10px] font-mono text-muted-foreground hover:text-primary transition-colors flex items-center gap-0.5">
                                 Directions <ExternalLink className="w-2.5 h-2.5" />
@@ -834,14 +990,20 @@ export default function App() {
                   const high = getHighestBlend(s.blends); const col = BLEND_COLORS[high] || "#4ADE80";
                   const isAct = activeEthStation === s.id;
                   const distFromUser = userLoc && isInIndia(userLoc.lat, userLoc.lng) ? haversineKm(userLoc.lat, userLoc.lng, s.lat, s.lng) : null;
+                  const isPopular = s.operator === "IOCL" && s.open24h;
+                  // Show price for the highest available blend
+                  const blendPrice = high === "E100" ? currentPrices.e100 : high === "E85" ? currentPrices.e85 : high === "E50" ? undefined : currentPrices.e20;
                   return (
                     <motion.div key={s.id} className="px-4 py-3 border-b border-border cursor-pointer transition-all duration-150" style={{ background: isAct ? "#161D13" : "transparent" }}
                       onClick={() => { setActiveEthStation(s.id); setMapAction({ lat: s.lat, lng: s.lng, zoom: 16 }); }}
                       onMouseEnter={() => setActiveEthStation(s.id)} onMouseLeave={() => setActiveEthStation(null)}
                       initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ delay: Math.min(i * 0.025, 0.25), duration: 0.25 }}>
                       <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: col + "18", border: `1.5px solid ${col}40` }}>
-                          <Leaf className="w-3.5 h-3.5" style={{ color: col }} />
+                        <div className="relative flex-shrink-0 mt-0.5">
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: col + "18", border: `1.5px solid ${col}40` }}>
+                            <Leaf className="w-3.5 h-3.5" style={{ color: col }} />
+                          </div>
+                          {isPopular && <span className="absolute -top-1 -right-1 text-[7px] leading-none px-1 py-0.5 rounded-full font-bold font-mono" style={{ background: "#FF8A3D", color: "#fff" }}>🔥</span>}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-1">
@@ -851,12 +1013,15 @@ export default function App() {
                           <div className="text-[10px] text-muted-foreground mt-0.5 truncate">{s.address}</div>
                           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                             {s.blends.map((b) => <BlendBadge key={b} blend={b} />)}
-                            <span className="text-[9px] font-mono text-muted-foreground ml-auto">{s.operator}</span>
+                            {blendPrice && <span className="text-[10px] font-mono font-bold ml-auto" style={{ color: col }}>₹{blendPrice}/L</span>}
                           </div>
                           <div className="flex items-center justify-between mt-1.5">
-                            <div className="flex items-center gap-1.5">
-                              <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.open24h ? "#4ADE80" : "#7A828E" }} />
-                              <span className="text-[10px] font-mono" style={{ color: s.open24h ? "#4ADE80" : "#7A828E" }}>{s.open24h ? "Open 24h" : "Check timing"}</span>
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.open24h ? "#4ADE80" : "#7A828E" }} />
+                                <span className="text-[10px] font-mono" style={{ color: s.open24h ? "#4ADE80" : "#7A828E" }}>{s.open24h ? "Open 24h" : "Check timing"}</span>
+                              </div>
+                              {isPopular && <span className="text-[9px] font-mono text-orange-400">Most Used</span>}
                             </div>
                             <a href={mapsUrl(s.lat, s.lng)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-[10px] font-mono hover:underline flex items-center gap-0.5" style={{ color: col }}>
                               Directions <ExternalLink className="w-2.5 h-2.5" />
@@ -909,6 +1074,7 @@ export default function App() {
             </div>
           )}
         </div>
+        </div>{/* end left+map row */}
       </div>
 
       {/* ══════════════════ INDIA ETHANOL GUIDE ══════════════════ */}

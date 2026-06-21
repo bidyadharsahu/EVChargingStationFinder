@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import maplibregl from "maplibre-gl";
+import Supercluster from "supercluster";
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
   MapPin, Zap, Search, Navigation, X, RefreshCw, ChevronDown,
@@ -390,7 +391,11 @@ function getConnectors(s: OCMStation): string[] {
 }
 
 function getMaxPower(s: OCMStation) { return Math.max(0, ...(s.Connections || []).map((c) => c.PowerKW || 0)); }
-function isOperational(s: OCMStation) { return s.StatusType == null || s.StatusType.IsOperational !== false; }
+type StationStatus = "operational" | "offline" | "unverified";
+function getStationStatus(s: OCMStation): StationStatus {
+  if (s.StatusType == null || s.StatusType.IsOperational == null) return "unverified";
+  return s.StatusType.IsOperational ? "operational" : "offline";
+}
 function fmtDist(d?: number) { return !d ? "" : d < 1 ? `${Math.round(d * 1000)}m` : `${d.toFixed(1)} km`; }
 function mapsUrl(lat: number, lng: number) { return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`; }
 
@@ -401,13 +406,39 @@ function getHighestBlend(blends: string[]): string {
 
 // ── API ────────────────────────────────────────────────────────────────────────
 
-async function fetchOCMStations(lat: number, lng: number, distKm: number, countryCode?: string): Promise<OCMStation[]> {
+const OCM_CONN_MAP: Record<string, number> = { "CCS": 33, "CHAdeMO": 2, "Type 2": 25, "J1772": 1, "NACS": 27 };
+
+async function fetchOCMStations(lat: number, lng: number, distKm: number, countryCode?: string, connFilter?: string | null): Promise<OCMStation[]> {
+  const rLat = lat.toFixed(2);
+  const rLng = lng.toFixed(2);
+  const cacheKey = `ocm_${rLat}_${rLng}_${distKm}_${countryCode || ''}_${connFilter || ''}`;
+  
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const { timestamp, data } = JSON.parse(cached);
+      if (Date.now() - timestamp < 24 * 60 * 60 * 1000) return data;
+    }
+  } catch (e) {}
+
   const cc = countryCode ? `&countrycode=${countryCode}` : "";
-  const url = `https://api.openchargemap.io/v3/poi/?output=json&latitude=${lat}&longitude=${lng}&distance=${distKm}&maxresults=100&distanceunit=KM&verbose=false${cc}`;
-  const res = await fetch(url);
+  const connId = connFilter && OCM_CONN_MAP[connFilter] ? `&connectiontypeid=${OCM_CONN_MAP[connFilter]}` : "";
+  const url = `https://api.openchargemap.io/v3/poi/?output=json&latitude=${lat}&longitude=${lng}&distance=${distKm}&maxresults=100&distanceunit=KM&verbose=false${cc}${connId}`;
+  
+  const headers: HeadersInit = {};
+  const apiKey = import.meta.env.VITE_OCM_API_KEY || "YOUR_DUMMY_KEY_HERE";
+  if (apiKey) headers["X-API-Key"] = apiKey;
+
+  const res = await fetch(url, { headers });
   if (!res.ok) throw new Error("API error");
   const data = await res.json();
-  return Array.isArray(data) ? data : [];
+  const arr = Array.isArray(data) ? data : [];
+  
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify({ timestamp: Date.now(), data: arr }));
+  } catch (e) {}
+  
+  return arr;
 }
 
 async function geocodeSearch(query: string): Promise<GeoResult[]> {
@@ -429,10 +460,20 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
 const BOLT_HTML = `<svg viewBox="0 0 24 24" style="width:10px;height:10px;fill:#000;display:block"><path d="M13 2L4.09 12.96H11L11 22L19.91 11.04H13L13 2Z"/></svg>`;
 const BLEND_COLORS: Record<string, string> = { E20: "#4ADE80", E50: "#22C55E", E85: "#16A34A", E100: "#15803D", E10: "#86EFAC" };
 
-function makeEVMarkerEl(color: string, operational: boolean): HTMLElement {
+function makeEVMarkerEl(color: string, status: StationStatus): HTMLElement {
   const el = document.createElement("div");
-  el.style.cssText = `width:24px;height:24px;border-radius:50%;background:${operational ? color : "#52575E"};border:2.5px solid rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px ${color}33,0 2px 6px rgba(0,0,0,0.4);cursor:pointer;`;
+  const bg = status === "operational" ? color : (status === "offline" ? "#FF4D4D" : "#7A828E");
+  el.style.cssText = `width:24px;height:24px;border-radius:50%;background:${bg};border:2.5px solid rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px ${bg}33,0 2px 6px rgba(0,0,0,0.4);cursor:pointer;`;
   el.innerHTML = BOLT_HTML;
+  return el;
+}
+
+function makeClusterMarkerEl(count: number, fuelMode: string): HTMLElement {
+  const el = document.createElement("div");
+  const color = fuelMode === "ev" ? "#C2FF3D" : "#22C55E";
+  const size = count < 10 ? 28 : count < 50 ? 34 : 40;
+  el.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px ${color}44,0 2px 8px rgba(0,0,0,0.4);cursor:pointer;color:#0F1217;font-weight:700;font-family:monospace;font-size:${size/2.5}px`;
+  el.innerText = count.toString();
   return el;
 }
 
@@ -455,10 +496,12 @@ function makeUserMarkerEl(): HTMLElement {
 // ── Popup HTML builders (used with raw Leaflet, no react-leaflet) ─────────────
 
 function evPopupHTML(s: OCMStation): string {
-  const conns = getConnectors(s); const power = getMaxPower(s); const op = isOperational(s);
+  const conns = getConnectors(s); const power = getMaxPower(s); const status = getStationStatus(s);
   const addr = [s.AddressInfo.AddressLine1, s.AddressInfo.Town].filter(Boolean).join(", ");
   const badges = conns.map(c => { const col = CONNECTOR_COLORS[c] || "#7A828E"; return `<span style="font-size:9px;font-family:monospace;font-weight:600;padding:2px 6px;border-radius:3px;color:${col};background:${col}18;border:1px solid ${col}35;letter-spacing:.08em">${c}</span>`; }).join("");
-  return `<div style="font-family:'DM Sans',sans-serif;padding:14px 16px;min-width:210px;max-width:250px"><div style="font-weight:600;font-size:13px;color:#F3F1EA;margin-bottom:4px;line-height:1.3">${s.AddressInfo.Title}</div>${addr ? `<div style="font-size:11px;color:#7A828E;margin-bottom:8px">${addr}</div>` : ""}<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;align-items:center">${badges}${power > 0 ? `<span style="font-size:10px;font-family:monospace;color:#C2FF3D;margin-left:auto">${power} kW</span>` : ""}</div><div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:5px"><div style="width:6px;height:6px;border-radius:50%;background:${op ? "#C2FF3D" : "#FF4D4D"}"></div><span style="font-size:10px;font-family:monospace;color:${op ? "#C2FF3D" : "#FF4D4D"}">${op ? "Operational" : "Unavailable"}</span></div><a href="${mapsUrl(s.AddressInfo.Latitude, s.AddressInfo.Longitude)}" target="_blank" style="font-size:11px;color:#C2FF3D;text-decoration:none">Directions ↗</a></div></div>`;
+  const dotColor = status === "operational" ? "#C2FF3D" : (status === "offline" ? "#FF4D4D" : "#7A828E");
+  const label = status === "operational" ? "Operational" : (status === "offline" ? "Unavailable" : "Unverified");
+  return `<div style="font-family:'DM Sans',sans-serif;padding:14px 16px;min-width:210px;max-width:250px"><div style="font-weight:600;font-size:13px;color:#F3F1EA;margin-bottom:4px;line-height:1.3">${s.AddressInfo.Title}</div>${addr ? `<div style="font-size:11px;color:#7A828E;margin-bottom:8px">${addr}</div>` : ""}<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;align-items:center">${badges}${power > 0 ? `<span style="font-size:10px;font-family:monospace;color:#C2FF3D;margin-left:auto">${power} kW</span>` : ""}</div><div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:5px"><div style="width:6px;height:6px;border-radius:50%;background:${dotColor}"></div><span style="font-size:10px;font-family:monospace;color:${dotColor}">${label}</span></div><a href="${mapsUrl(s.AddressInfo.Latitude, s.AddressInfo.Longitude)}" target="_blank" style="font-size:11px;color:#C2FF3D;text-decoration:none">Directions ↗</a></div><a href="https://openchargemap.org/site/poi/edit/${s.ID}" target="_blank" style="font-size:9px;color:#7A828E;text-decoration:underline;display:block;margin-top:10px;text-align:center">Report Incorrect Data</a></div>`;
 }
 
 function ethPopupHTML(s: EthanolStation): string {
@@ -622,36 +665,88 @@ export default function App() {
 
   // Station markers — re-render whenever stations or mode changes
   useEffect(() => {
-    stationMarkersRef.current.forEach((m) => m.remove());
-    stationMarkersRef.current = [];
     if (!leafletRef.current) return;
     const map = leafletRef.current;
+    
+    const index = new Supercluster({ radius: 50, maxZoom: 15 });
+    
+    const points: any[] = [];
     if (fuelMode === "ev") {
       filteredEV.forEach((s) => {
-        const col = CONNECTOR_COLORS[getConnectors(s)[0]] || "#C2FF3D";
-        const el = makeEVMarkerEl(col, isOperational(s));
-        const popup = new maplibregl.Popup({ offset: 14, maxWidth: "280px" }).setHTML(evPopupHTML(s));
-        el.addEventListener("click", () => setActiveEVStation(s.ID));
-        const m = new maplibregl.Marker({ element: el })
-          .setLngLat([s.AddressInfo.Longitude, s.AddressInfo.Latitude])
-          .setPopup(popup)
-          .addTo(map);
-        stationMarkersRef.current.push(m);
+        points.push({
+          type: "Feature",
+          properties: { cluster: false, type: "ev", station: s },
+          geometry: { type: "Point", coordinates: [s.AddressInfo.Longitude, s.AddressInfo.Latitude] }
+        });
       });
     } else {
       filteredEth.forEach((s) => {
-        const high = getHighestBlend(s.blends);
-        const el = makeEthanolMarkerEl(high);
-        const popup = new maplibregl.Popup({ offset: 16, maxWidth: "280px" }).setHTML(ethPopupHTML(s));
-        el.addEventListener("click", () => setActiveEthStation(s.id));
-        const m = new maplibregl.Marker({ element: el })
-          .setLngLat([s.lng, s.lat])
-          .setPopup(popup)
-          .addTo(map);
+        points.push({
+          type: "Feature",
+          properties: { cluster: false, type: "eth", station: s },
+          geometry: { type: "Point", coordinates: [s.lng, s.lat] }
+        });
+      });
+    }
+    index.load(points);
+
+    function updateClusters() {
+      if (!leafletRef.current) return;
+      const bounds = map.getBounds();
+      const zoom = Math.floor(map.getZoom());
+      const bbox: [number, number, number, number] = [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()];
+      
+      const clusters = index.getClusters(bbox, zoom);
+      
+      stationMarkersRef.current.forEach((m) => m.remove());
+      stationMarkersRef.current = [];
+      
+      clusters.forEach((f: any) => {
+        const [lng, lat] = f.geometry.coordinates;
+        const props = f.properties;
+        let el: HTMLElement;
+        let popup: maplibregl.Popup | undefined;
+        let onClick: () => void;
+        
+        if (props.cluster) {
+          el = makeClusterMarkerEl(props.point_count, fuelMode);
+          onClick = () => {
+            const expZoom = index.getClusterExpansionZoom(props.cluster_id);
+            map.flyTo({ center: [lng, lat], zoom: expZoom, duration: 500 });
+          };
+        } else {
+          if (props.type === "ev") {
+            const s = props.station as OCMStation;
+            const col = CONNECTOR_COLORS[getConnectors(s)[0]] || "#C2FF3D";
+            el = makeEVMarkerEl(col, getStationStatus(s));
+            popup = new maplibregl.Popup({ offset: 14, maxWidth: "280px" }).setHTML(evPopupHTML(s));
+            onClick = () => setActiveEVStation(s.ID);
+          } else {
+            const s = props.station as EthanolStation;
+            const high = getHighestBlend(s.blends);
+            el = makeEthanolMarkerEl(high);
+            popup = new maplibregl.Popup({ offset: 16, maxWidth: "280px" }).setHTML(ethPopupHTML(s));
+            onClick = () => setActiveEthStation(s.id);
+          }
+        }
+        
+        el.addEventListener("click", onClick);
+        const m = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]);
+        if (popup) m.setPopup(popup);
+        m.addTo(map);
         stationMarkersRef.current.push(m);
       });
     }
-  }, [fuelMode, evStations, connFilter, ethanolCity, blendFilter, userLoc]);
+
+    map.on('move', updateClusters);
+    updateClusters();
+
+    return () => {
+      map.off('move', updateClusters);
+      stationMarkersRef.current.forEach((m) => m.remove());
+      stationMarkersRef.current = [];
+    };
+  }, [fuelMode, filteredEV, filteredEth]);
 
   const handleCountryChange = useCallback((country: Country) => {
     setSelectedCountry(country);
@@ -664,9 +759,9 @@ export default function App() {
     if (!country.hasEthanol && fuelMode === "ethanol") setFuelMode("ev");
   }, [fuelMode]);
 
-  const loadEVStations = useCallback(async (lat: number, lng: number, dist: number, cc?: string) => {
+  const loadEVStations = useCallback(async (lat: number, lng: number, dist: number, cc?: string, cf?: string) => {
     setEvFetching(true);
-    try { setEvStations(await fetchOCMStations(lat, lng, dist, cc)); }
+    try { setEvStations(await fetchOCMStations(lat, lng, dist, cc, cf === "All" ? null : cf)); }
     catch { setEvStations([]); }
     finally { setEvFetching(false); }
   }, []);
@@ -680,7 +775,7 @@ export default function App() {
         setMapAction({ lat, lng, zoom: 16 });
         setStep("loaded");
         if (fuelMode === "ev") {
-          loadEVStations(lat, lng, distKm, selectedCountry.code);
+          loadEVStations(lat, lng, distKm, selectedCountry.code, connFilter);
         } else {
           if (isInIndia(lat, lng)) {
             const city = nearestEthCity(lat, lng);
@@ -693,7 +788,7 @@ export default function App() {
       () => setStep("denied"),
       { timeout: 12000, enableHighAccuracy: true }
     );
-  }, [fuelMode, distKm, loadEVStations]);
+  }, [fuelMode, distKm, loadEVStations, connFilter, selectedCountry]);
 
   const pickGeoResult = useCallback(async (r: GeoResult) => {
     const lat = parseFloat(r.lat), lng = parseFloat(r.lon);
@@ -704,7 +799,7 @@ export default function App() {
     setCityQuery(label);
     setGeoResults([]); setSearchFocus(false);
     if (fuelMode === "ev") {
-      loadEVStations(lat, lng, distKm);
+      loadEVStations(lat, lng, distKm, selectedCountry.code, connFilter);
     } else {
       if (isInIndia(lat, lng)) {
         const city = nearestEthCity(lat, lng);
@@ -712,7 +807,7 @@ export default function App() {
         setMapAction({ lat: ETHANOL_CITY_CENTERS[city][0], lng: ETHANOL_CITY_CENTERS[city][1], zoom: 13 });
       }
     }
-  }, [fuelMode, distKm, loadEVStations]);
+  }, [fuelMode, distKm, loadEVStations, connFilter, selectedCountry]);
 
   const handleCityInput = (val: string) => {
     setCityQuery(val);
@@ -732,7 +827,7 @@ export default function App() {
 
   const changeDistance = (km: number) => {
     setDistKm(km);
-    if (userLoc && step === "loaded" && fuelMode === "ev") loadEVStations(userLoc.lat, userLoc.lng, km, selectedCountry.code);
+    if (userLoc && step === "loaded" && fuelMode === "ev") loadEVStations(userLoc.lat, userLoc.lng, km, selectedCountry.code, connFilter);
   };
 
   const switchMode = (mode: FuelMode) => {

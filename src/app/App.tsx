@@ -589,6 +589,14 @@ export default function App() {
       zoom: 4,
       attributionControl: true,
     });
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+    map.addControl(
+      new maplibregl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true },
+        trackUserLocation: true,
+      }),
+      "top-right"
+    );
     leafletRef.current = map;
     return () => { map.remove(); leafletRef.current = null; };
   }, []);
@@ -669,7 +677,7 @@ export default function App() {
       async (pos) => {
         const { latitude: lat, longitude: lng } = pos.coords;
         setUserLoc({ lat, lng });
-        setMapAction({ lat, lng, zoom: 14 });
+        setMapAction({ lat, lng, zoom: 16 });
         setStep("loaded");
         if (fuelMode === "ev") {
           loadEVStations(lat, lng, distKm, selectedCountry.code);
@@ -689,7 +697,7 @@ export default function App() {
 
   const pickGeoResult = useCallback(async (r: GeoResult) => {
     const lat = parseFloat(r.lat), lng = parseFloat(r.lon);
-    setMapAction({ lat, lng, zoom: 13 });
+    setMapAction({ lat, lng, zoom: 16 });
     setStep("loaded");
     const label = r.display_name.split(",")[0];
     setLocationLabel(label);

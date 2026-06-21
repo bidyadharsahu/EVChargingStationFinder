@@ -5,8 +5,9 @@ import Supercluster from "supercluster";
 import "maplibre-gl/dist/maplibre-gl.css";
 import {
   MapPin, Zap, Search, Navigation, X, RefreshCw, ChevronDown,
-  ExternalLink, AlertCircle, Loader2, Leaf,
+  ExternalLink, AlertCircle, Loader2, Leaf, ThumbsUp, ThumbsDown
 } from "lucide-react";
+import { fetchStationStats, submitStationReport } from "../lib/supabase";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,7 @@ interface EthanolStation {
   lat: number;
   lng: number;
   open24h: boolean;
+  source?: "curated" | "live";
 }
 
 interface GeoResult {
@@ -60,96 +62,96 @@ type MapAction = { lat: number; lng: number; zoom?: number } | null;
 
 const ETHANOL_PUMPS: Record<string, EthanolStation[]> = {
   Delhi: [
-    { id: "d1", name: "IOCL Connaught Place", address: "Parliament Street, Connaught Place, New Delhi 110001", city: "Delhi", state: "Delhi", blends: ["E20", "E10"], operator: "IOCL", lat: 28.6329, lng: 77.2195, open24h: true },
-    { id: "d2", name: "BPCL Karol Bagh", address: "Ajmal Khan Road, Karol Bagh, Delhi 110005", city: "Delhi", state: "Delhi", blends: ["E20"], operator: "BPCL", lat: 28.6517, lng: 77.1907, open24h: false },
-    { id: "d3", name: "HPCL Lajpat Nagar", address: "Ring Road, Lajpat Nagar, New Delhi 110024", city: "Delhi", state: "Delhi", blends: ["E20", "E10"], operator: "HPCL", lat: 28.5671, lng: 77.2431, open24h: true },
-    { id: "d4", name: "IOCL Dwarka Sector 10", address: "Sector 10, Dwarka, New Delhi 110075", city: "Delhi", state: "Delhi", blends: ["E20", "E85"], operator: "IOCL", lat: 28.5892, lng: 77.0466, open24h: true },
-    { id: "d5", name: "HPCL Rohini Sector 7", address: "Sector 7, Rohini, Delhi 110085", city: "Delhi", state: "Delhi", blends: ["E20"], operator: "HPCL", lat: 28.7141, lng: 77.1025, open24h: false },
-    { id: "d6", name: "BPCL Saket District Centre", address: "District Centre, Saket, New Delhi 110017", city: "Delhi", state: "Delhi", blends: ["E20", "E85"], operator: "BPCL", lat: 28.5244, lng: 77.2167, open24h: true },
-    { id: "d7", name: "IOCL Noida Sector 18", address: "Sector 18, Noida, Uttar Pradesh 201301", city: "Delhi", state: "UP", blends: ["E20", "E85", "E10"], operator: "IOCL", lat: 28.5706, lng: 77.3219, open24h: true },
-    { id: "d8", name: "HPCL Gurugram Sohna Road", address: "Sohna Road, Sector 47, Gurugram 122018", city: "Delhi", state: "Haryana", blends: ["E20"], operator: "HPCL", lat: 28.4595, lng: 77.0266, open24h: false },
+    { id: "d1", name: "IOCL Connaught Place", address: "Parliament Street, Connaught Place, New Delhi 110001", city: "Delhi", state: "Delhi", blends: ["E20", "E10"], operator: "IOCL", lat: 28.6329, lng: 77.2195, open24h: true, source: "curated" },
+    { id: "d2", name: "BPCL Karol Bagh", address: "Ajmal Khan Road, Karol Bagh, Delhi 110005", city: "Delhi", state: "Delhi", blends: ["E20"], operator: "BPCL", lat: 28.6517, lng: 77.1907, open24h: false, source: "curated" },
+    { id: "d3", name: "HPCL Lajpat Nagar", address: "Ring Road, Lajpat Nagar, New Delhi 110024", city: "Delhi", state: "Delhi", blends: ["E20", "E10"], operator: "HPCL", lat: 28.5671, lng: 77.2431, open24h: true, source: "curated" },
+    { id: "d4", name: "IOCL Dwarka Sector 10", address: "Sector 10, Dwarka, New Delhi 110075", city: "Delhi", state: "Delhi", blends: ["E20", "E85"], operator: "IOCL", lat: 28.5892, lng: 77.0466, open24h: true, source: "curated" },
+    { id: "d5", name: "HPCL Rohini Sector 7", address: "Sector 7, Rohini, Delhi 110085", city: "Delhi", state: "Delhi", blends: ["E20"], operator: "HPCL", lat: 28.7141, lng: 77.1025, open24h: false, source: "curated" },
+    { id: "d6", name: "BPCL Saket District Centre", address: "District Centre, Saket, New Delhi 110017", city: "Delhi", state: "Delhi", blends: ["E20", "E85"], operator: "BPCL", lat: 28.5244, lng: 77.2167, open24h: true, source: "curated" },
+    { id: "d7", name: "IOCL Noida Sector 18", address: "Sector 18, Noida, Uttar Pradesh 201301", city: "Delhi", state: "UP", blends: ["E20", "E85", "E10"], operator: "IOCL", lat: 28.5706, lng: 77.3219, open24h: true, source: "curated" },
+    { id: "d8", name: "HPCL Gurugram Sohna Road", address: "Sohna Road, Sector 47, Gurugram 122018", city: "Delhi", state: "Haryana", blends: ["E20"], operator: "HPCL", lat: 28.4595, lng: 77.0266, open24h: false, source: "curated" },
   ],
   Mumbai: [
-    { id: "m1", name: "IOCL Bandra West", address: "Linking Road, Bandra West, Mumbai 400050", city: "Mumbai", state: "Maharashtra", blends: ["E20", "E10"], operator: "IOCL", lat: 19.0600, lng: 72.8377, open24h: true },
-    { id: "m2", name: "BPCL Andheri East", address: "MIDC, Andheri East, Mumbai 400093", city: "Mumbai", state: "Maharashtra", blends: ["E20", "E85"], operator: "BPCL", lat: 19.1136, lng: 72.8697, open24h: true },
-    { id: "m3", name: "HPCL Powai", address: "LBS Marg, Powai, Mumbai 400076", city: "Mumbai", state: "Maharashtra", blends: ["E20"], operator: "HPCL", lat: 19.1197, lng: 72.9048, open24h: false },
-    { id: "m4", name: "IOCL Lower Parel", address: "Senapati Bapat Marg, Lower Parel, Mumbai 400013", city: "Mumbai", state: "Maharashtra", blends: ["E20", "E85"], operator: "IOCL", lat: 18.9985, lng: 72.8291, open24h: true },
-    { id: "m5", name: "BPCL Thane West", address: "Gokhale Road, Thane West 400602", city: "Mumbai", state: "Maharashtra", blends: ["E20"], operator: "BPCL", lat: 19.2183, lng: 72.9781, open24h: false },
-    { id: "m6", name: "HPCL Vashi Navi Mumbai", address: "Sector 17, Vashi, Navi Mumbai 400703", city: "Mumbai", state: "Maharashtra", blends: ["E20", "E100"], operator: "HPCL", lat: 19.0771, lng: 73.0024, open24h: true },
-    { id: "m7", name: "Nayara Energy Borivali West", address: "S.V. Road, Borivali West, Mumbai 400092", city: "Mumbai", state: "Maharashtra", blends: ["E20"], operator: "Nayara", lat: 19.2307, lng: 72.8567, open24h: false },
+    { id: "m1", name: "IOCL Bandra West", address: "Linking Road, Bandra West, Mumbai 400050", city: "Mumbai", state: "Maharashtra", blends: ["E20", "E10"], operator: "IOCL", lat: 19.0600, lng: 72.8377, open24h: true, source: "curated" },
+    { id: "m2", name: "BPCL Andheri East", address: "MIDC, Andheri East, Mumbai 400093", city: "Mumbai", state: "Maharashtra", blends: ["E20", "E85"], operator: "BPCL", lat: 19.1136, lng: 72.8697, open24h: true, source: "curated" },
+    { id: "m3", name: "HPCL Powai", address: "LBS Marg, Powai, Mumbai 400076", city: "Mumbai", state: "Maharashtra", blends: ["E20"], operator: "HPCL", lat: 19.1197, lng: 72.9048, open24h: false, source: "curated" },
+    { id: "m4", name: "IOCL Lower Parel", address: "Senapati Bapat Marg, Lower Parel, Mumbai 400013", city: "Mumbai", state: "Maharashtra", blends: ["E20", "E85"], operator: "IOCL", lat: 18.9985, lng: 72.8291, open24h: true, source: "curated" },
+    { id: "m5", name: "BPCL Thane West", address: "Gokhale Road, Thane West 400602", city: "Mumbai", state: "Maharashtra", blends: ["E20"], operator: "BPCL", lat: 19.2183, lng: 72.9781, open24h: false, source: "curated" },
+    { id: "m6", name: "HPCL Vashi Navi Mumbai", address: "Sector 17, Vashi, Navi Mumbai 400703", city: "Mumbai", state: "Maharashtra", blends: ["E20", "E100"], operator: "HPCL", lat: 19.0771, lng: 73.0024, open24h: true, source: "curated" },
+    { id: "m7", name: "Nayara Energy Borivali West", address: "S.V. Road, Borivali West, Mumbai 400092", city: "Mumbai", state: "Maharashtra", blends: ["E20"], operator: "Nayara", lat: 19.2307, lng: 72.8567, open24h: false, source: "curated" },
   ],
   Bangalore: [
-    { id: "b1", name: "IOCL Koramangala 5th Block", address: "80 Feet Road, Koramangala, Bangalore 560034", city: "Bangalore", state: "Karnataka", blends: ["E20", "E10"], operator: "IOCL", lat: 12.9349, lng: 77.6265, open24h: true },
-    { id: "b2", name: "BPCL Whitefield Main Road", address: "ITPL Main Road, Whitefield, Bangalore 560066", city: "Bangalore", state: "Karnataka", blends: ["E20", "E85"], operator: "BPCL", lat: 12.9698, lng: 77.7499, open24h: true },
-    { id: "b3", name: "HPCL Electronic City Phase 1", address: "Hosur Main Road, Electronic City, Bangalore 560100", city: "Bangalore", state: "Karnataka", blends: ["E20"], operator: "HPCL", lat: 12.8467, lng: 77.6651, open24h: false },
-    { id: "b4", name: "IOCL Marathahalli", address: "Marathahalli Junction, Outer Ring Road, Bangalore 560037", city: "Bangalore", state: "Karnataka", blends: ["E20", "E85"], operator: "IOCL", lat: 12.9591, lng: 77.6971, open24h: true },
-    { id: "b5", name: "BPCL JP Nagar 4th Phase", address: "Bannerghatta Road, JP Nagar, Bangalore 560078", city: "Bangalore", state: "Karnataka", blends: ["E20"], operator: "BPCL", lat: 12.9130, lng: 77.5950, open24h: false },
-    { id: "b6", name: "HPCL Hebbal Flyover", address: "NH 44, Hebbal, Bangalore 560024", city: "Bangalore", state: "Karnataka", blends: ["E20"], operator: "HPCL", lat: 13.0358, lng: 77.5924, open24h: true },
+    { id: "b1", name: "IOCL Koramangala 5th Block", address: "80 Feet Road, Koramangala, Bangalore 560034", city: "Bangalore", state: "Karnataka", blends: ["E20", "E10"], operator: "IOCL", lat: 12.9349, lng: 77.6265, open24h: true, source: "curated" },
+    { id: "b2", name: "BPCL Whitefield Main Road", address: "ITPL Main Road, Whitefield, Bangalore 560066", city: "Bangalore", state: "Karnataka", blends: ["E20", "E85"], operator: "BPCL", lat: 12.9698, lng: 77.7499, open24h: true, source: "curated" },
+    { id: "b3", name: "HPCL Electronic City Phase 1", address: "Hosur Main Road, Electronic City, Bangalore 560100", city: "Bangalore", state: "Karnataka", blends: ["E20"], operator: "HPCL", lat: 12.8467, lng: 77.6651, open24h: false, source: "curated" },
+    { id: "b4", name: "IOCL Marathahalli", address: "Marathahalli Junction, Outer Ring Road, Bangalore 560037", city: "Bangalore", state: "Karnataka", blends: ["E20", "E85"], operator: "IOCL", lat: 12.9591, lng: 77.6971, open24h: true, source: "curated" },
+    { id: "b5", name: "BPCL JP Nagar 4th Phase", address: "Bannerghatta Road, JP Nagar, Bangalore 560078", city: "Bangalore", state: "Karnataka", blends: ["E20"], operator: "BPCL", lat: 12.9130, lng: 77.5950, open24h: false, source: "curated" },
+    { id: "b6", name: "HPCL Hebbal Flyover", address: "NH 44, Hebbal, Bangalore 560024", city: "Bangalore", state: "Karnataka", blends: ["E20"], operator: "HPCL", lat: 13.0358, lng: 77.5924, open24h: true, source: "curated" },
   ],
   Chennai: [
-    { id: "c1", name: "IOCL Anna Nagar West", address: "Anna Nagar West, Chennai 600040", city: "Chennai", state: "Tamil Nadu", blends: ["E20", "E10"], operator: "IOCL", lat: 13.0850, lng: 80.2101, open24h: true },
-    { id: "c2", name: "BPCL T Nagar Pondy Bazaar", address: "Pondy Bazaar, T Nagar, Chennai 600017", city: "Chennai", state: "Tamil Nadu", blends: ["E20"], operator: "BPCL", lat: 13.0418, lng: 80.2341, open24h: false },
-    { id: "c3", name: "HPCL Velachery Main Road", address: "Velachery Main Road, Velachery, Chennai 600042", city: "Chennai", state: "Tamil Nadu", blends: ["E20", "E85"], operator: "HPCL", lat: 12.9815, lng: 80.2209, open24h: true },
-    { id: "c4", name: "IOCL Perungudi IT Corridor", address: "OMR, Perungudi, Chennai 600096", city: "Chennai", state: "Tamil Nadu", blends: ["E20", "E85"], operator: "IOCL", lat: 12.9671, lng: 80.2375, open24h: true },
-    { id: "c5", name: "BPCL Tambaram Main Road", address: "Tambaram Main Road, Tambaram, Chennai 600045", city: "Chennai", state: "Tamil Nadu", blends: ["E20"], operator: "BPCL", lat: 12.9249, lng: 80.1000, open24h: false },
+    { id: "c1", name: "IOCL Anna Nagar West", address: "Anna Nagar West, Chennai 600040", city: "Chennai", state: "Tamil Nadu", blends: ["E20", "E10"], operator: "IOCL", lat: 13.0850, lng: 80.2101, open24h: true, source: "curated" },
+    { id: "c2", name: "BPCL T Nagar Pondy Bazaar", address: "Pondy Bazaar, T Nagar, Chennai 600017", city: "Chennai", state: "Tamil Nadu", blends: ["E20"], operator: "BPCL", lat: 13.0418, lng: 80.2341, open24h: false, source: "curated" },
+    { id: "c3", name: "HPCL Velachery Main Road", address: "Velachery Main Road, Velachery, Chennai 600042", city: "Chennai", state: "Tamil Nadu", blends: ["E20", "E85"], operator: "HPCL", lat: 12.9815, lng: 80.2209, open24h: true, source: "curated" },
+    { id: "c4", name: "IOCL Perungudi IT Corridor", address: "OMR, Perungudi, Chennai 600096", city: "Chennai", state: "Tamil Nadu", blends: ["E20", "E85"], operator: "IOCL", lat: 12.9671, lng: 80.2375, open24h: true, source: "curated" },
+    { id: "c5", name: "BPCL Tambaram Main Road", address: "Tambaram Main Road, Tambaram, Chennai 600045", city: "Chennai", state: "Tamil Nadu", blends: ["E20"], operator: "BPCL", lat: 12.9249, lng: 80.1000, open24h: false, source: "curated" },
   ],
   Pune: [
-    { id: "p1", name: "IOCL Kothrud Depot Road", address: "Depot Road, Kothrud, Pune 411038", city: "Pune", state: "Maharashtra", blends: ["E20", "E85", "E10"], operator: "IOCL", lat: 18.5080, lng: 73.8154, open24h: true },
-    { id: "p2", name: "BPCL Wakad Hinjewadi Road", address: "Hinjewadi Road, Wakad, Pune 411057", city: "Pune", state: "Maharashtra", blends: ["E20"], operator: "BPCL", lat: 18.5999, lng: 73.7608, open24h: false },
-    { id: "p3", name: "HPCL Hadapsar Solapur Road", address: "Solapur Road, Hadapsar, Pune 411028", city: "Pune", state: "Maharashtra", blends: ["E20", "E85"], operator: "HPCL", lat: 18.5070, lng: 73.9371, open24h: true },
-    { id: "p4", name: "IOCL Viman Nagar", address: "Nagar Road, Viman Nagar, Pune 411014", city: "Pune", state: "Maharashtra", blends: ["E20"], operator: "IOCL", lat: 18.5679, lng: 73.9143, open24h: true },
-    { id: "p5", name: "BPCL Baner Pashan Road", address: "Pashan Road, Baner, Pune 411045", city: "Pune", state: "Maharashtra", blends: ["E20"], operator: "BPCL", lat: 18.5590, lng: 73.7853, open24h: false },
+    { id: "p1", name: "IOCL Kothrud Depot Road", address: "Depot Road, Kothrud, Pune 411038", city: "Pune", state: "Maharashtra", blends: ["E20", "E85", "E10"], operator: "IOCL", lat: 18.5080, lng: 73.8154, open24h: true, source: "curated" },
+    { id: "p2", name: "BPCL Wakad Hinjewadi Road", address: "Hinjewadi Road, Wakad, Pune 411057", city: "Pune", state: "Maharashtra", blends: ["E20"], operator: "BPCL", lat: 18.5999, lng: 73.7608, open24h: false, source: "curated" },
+    { id: "p3", name: "HPCL Hadapsar Solapur Road", address: "Solapur Road, Hadapsar, Pune 411028", city: "Pune", state: "Maharashtra", blends: ["E20", "E85"], operator: "HPCL", lat: 18.5070, lng: 73.9371, open24h: true, source: "curated" },
+    { id: "p4", name: "IOCL Viman Nagar", address: "Nagar Road, Viman Nagar, Pune 411014", city: "Pune", state: "Maharashtra", blends: ["E20"], operator: "IOCL", lat: 18.5679, lng: 73.9143, open24h: true, source: "curated" },
+    { id: "p5", name: "BPCL Baner Pashan Road", address: "Pashan Road, Baner, Pune 411045", city: "Pune", state: "Maharashtra", blends: ["E20"], operator: "BPCL", lat: 18.5590, lng: 73.7853, open24h: false, source: "curated" },
   ],
   Hyderabad: [
-    { id: "h1", name: "IOCL Banjara Hills Rd No. 12", address: "Road No. 12, Banjara Hills, Hyderabad 500034", city: "Hyderabad", state: "Telangana", blends: ["E20", "E85"], operator: "IOCL", lat: 17.4126, lng: 78.4483, open24h: true },
-    { id: "h2", name: "BPCL Gachibowli Stadium Road", address: "Stadium Road, Gachibowli, Hyderabad 500032", city: "Hyderabad", state: "Telangana", blends: ["E20", "E10"], operator: "BPCL", lat: 17.4401, lng: 78.3489, open24h: true },
-    { id: "h3", name: "HPCL Kondapur Main Road", address: "Kondapur Main Road, Kondapur, Hyderabad 500084", city: "Hyderabad", state: "Telangana", blends: ["E20"], operator: "HPCL", lat: 17.4604, lng: 78.3574, open24h: false },
-    { id: "h4", name: "IOCL Kukatpally Housing Board", address: "KPHB Colony, Kukatpally, Hyderabad 500072", city: "Hyderabad", state: "Telangana", blends: ["E20", "E85"], operator: "IOCL", lat: 17.4849, lng: 78.3955, open24h: true },
-    { id: "h5", name: "BPCL Secunderabad Trimulgherry", address: "Trimulgherry, Secunderabad 500015", city: "Hyderabad", state: "Telangana", blends: ["E20"], operator: "BPCL", lat: 17.4399, lng: 78.4983, open24h: false },
+    { id: "h1", name: "IOCL Banjara Hills Rd No. 12", address: "Road No. 12, Banjara Hills, Hyderabad 500034", city: "Hyderabad", state: "Telangana", blends: ["E20", "E85"], operator: "IOCL", lat: 17.4126, lng: 78.4483, open24h: true, source: "curated" },
+    { id: "h2", name: "BPCL Gachibowli Stadium Road", address: "Stadium Road, Gachibowli, Hyderabad 500032", city: "Hyderabad", state: "Telangana", blends: ["E20", "E10"], operator: "BPCL", lat: 17.4401, lng: 78.3489, open24h: true, source: "curated" },
+    { id: "h3", name: "HPCL Kondapur Main Road", address: "Kondapur Main Road, Kondapur, Hyderabad 500084", city: "Hyderabad", state: "Telangana", blends: ["E20"], operator: "HPCL", lat: 17.4604, lng: 78.3574, open24h: false, source: "curated" },
+    { id: "h4", name: "IOCL Kukatpally Housing Board", address: "KPHB Colony, Kukatpally, Hyderabad 500072", city: "Hyderabad", state: "Telangana", blends: ["E20", "E85"], operator: "IOCL", lat: 17.4849, lng: 78.3955, open24h: true, source: "curated" },
+    { id: "h5", name: "BPCL Secunderabad Trimulgherry", address: "Trimulgherry, Secunderabad 500015", city: "Hyderabad", state: "Telangana", blends: ["E20"], operator: "BPCL", lat: 17.4399, lng: 78.4983, open24h: false, source: "curated" },
   ],
   Kolkata: [
-    { id: "k1", name: "IOCL Park Street", address: "Park Street, Kolkata 700016", city: "Kolkata", state: "West Bengal", blends: ["E20", "E10"], operator: "IOCL", lat: 22.5524, lng: 88.3519, open24h: true },
-    { id: "k2", name: "BPCL Salt Lake Sector V", address: "Sector V, Salt Lake, Kolkata 700091", city: "Kolkata", state: "West Bengal", blends: ["E20", "E85"], operator: "BPCL", lat: 22.5800, lng: 88.4079, open24h: true },
-    { id: "k3", name: "HPCL Dum Dum Airport Road", address: "Airport Road, Dum Dum, Kolkata 700028", city: "Kolkata", state: "West Bengal", blends: ["E20"], operator: "HPCL", lat: 22.6423, lng: 88.3957, open24h: false },
-    { id: "k4", name: "IOCL New Town Rajarhat", address: "Action Area I, New Town, Kolkata 700156", city: "Kolkata", state: "West Bengal", blends: ["E20"], operator: "IOCL", lat: 22.5815, lng: 88.4707, open24h: true },
+    { id: "k1", name: "IOCL Park Street", address: "Park Street, Kolkata 700016", city: "Kolkata", state: "West Bengal", blends: ["E20", "E10"], operator: "IOCL", lat: 22.5524, lng: 88.3519, open24h: true, source: "curated" },
+    { id: "k2", name: "BPCL Salt Lake Sector V", address: "Sector V, Salt Lake, Kolkata 700091", city: "Kolkata", state: "West Bengal", blends: ["E20", "E85"], operator: "BPCL", lat: 22.5800, lng: 88.4079, open24h: true, source: "curated" },
+    { id: "k3", name: "HPCL Dum Dum Airport Road", address: "Airport Road, Dum Dum, Kolkata 700028", city: "Kolkata", state: "West Bengal", blends: ["E20"], operator: "HPCL", lat: 22.6423, lng: 88.3957, open24h: false, source: "curated" },
+    { id: "k4", name: "IOCL New Town Rajarhat", address: "Action Area I, New Town, Kolkata 700156", city: "Kolkata", state: "West Bengal", blends: ["E20"], operator: "IOCL", lat: 22.5815, lng: 88.4707, open24h: true, source: "curated" },
   ],
   Ahmedabad: [
-    { id: "a1", name: "IOCL Navrangpura C G Road", address: "C G Road, Navrangpura, Ahmedabad 380009", city: "Ahmedabad", state: "Gujarat", blends: ["E20", "E10"], operator: "IOCL", lat: 23.0345, lng: 72.5620, open24h: true },
-    { id: "a2", name: "BPCL Vastrapur Lake Road", address: "Vastrapur Lake Road, Vastrapur, Ahmedabad 380015", city: "Ahmedabad", state: "Gujarat", blends: ["E20", "E85"], operator: "BPCL", lat: 23.0386, lng: 72.5281, open24h: false },
-    { id: "a3", name: "HPCL Satellite Road", address: "Satellite Road, Satellite, Ahmedabad 380015", city: "Ahmedabad", state: "Gujarat", blends: ["E20"], operator: "HPCL", lat: 23.0267, lng: 72.5079, open24h: true },
-    { id: "a4", name: "IOCL Chandkheda Highway", address: "Gandhinagar Highway, Chandkheda, Ahmedabad 382424", city: "Ahmedabad", state: "Gujarat", blends: ["E20"], operator: "IOCL", lat: 23.1047, lng: 72.5848, open24h: true },
+    { id: "a1", name: "IOCL Navrangpura C G Road", address: "C G Road, Navrangpura, Ahmedabad 380009", city: "Ahmedabad", state: "Gujarat", blends: ["E20", "E10"], operator: "IOCL", lat: 23.0345, lng: 72.5620, open24h: true, source: "curated" },
+    { id: "a2", name: "BPCL Vastrapur Lake Road", address: "Vastrapur Lake Road, Vastrapur, Ahmedabad 380015", city: "Ahmedabad", state: "Gujarat", blends: ["E20", "E85"], operator: "BPCL", lat: 23.0386, lng: 72.5281, open24h: false, source: "curated" },
+    { id: "a3", name: "HPCL Satellite Road", address: "Satellite Road, Satellite, Ahmedabad 380015", city: "Ahmedabad", state: "Gujarat", blends: ["E20"], operator: "HPCL", lat: 23.0267, lng: 72.5079, open24h: true, source: "curated" },
+    { id: "a4", name: "IOCL Chandkheda Highway", address: "Gandhinagar Highway, Chandkheda, Ahmedabad 382424", city: "Ahmedabad", state: "Gujarat", blends: ["E20"], operator: "IOCL", lat: 23.1047, lng: 72.5848, open24h: true, source: "curated" },
   ],
   Lucknow: [
-    { id: "l1", name: "IOCL Hazratganj Vidhan Sabha Road", address: "Vidhan Sabha Marg, Hazratganj, Lucknow 226001", city: "Lucknow", state: "Uttar Pradesh", blends: ["E20", "E100", "E85"], operator: "IOCL", lat: 26.8488, lng: 80.9462, open24h: true },
-    { id: "l2", name: "BPCL Gomti Nagar Viram Khand", address: "Viram Khand 1, Gomti Nagar, Lucknow 226010", city: "Lucknow", state: "Uttar Pradesh", blends: ["E20", "E10"], operator: "BPCL", lat: 26.8469, lng: 80.9984, open24h: false },
-    { id: "l3", name: "HPCL Alambagh Bus Stand", address: "Kanpur Road, Alambagh, Lucknow 226005", city: "Lucknow", state: "Uttar Pradesh", blends: ["E20"], operator: "HPCL", lat: 26.8103, lng: 80.9113, open24h: true },
-    { id: "l4", name: "IOCL Indira Nagar Faizabad Road", address: "Faizabad Road, Indira Nagar, Lucknow 226016", city: "Lucknow", state: "Uttar Pradesh", blends: ["E20", "E85"], operator: "IOCL", lat: 26.8832, lng: 81.0011, open24h: false },
+    { id: "l1", name: "IOCL Hazratganj Vidhan Sabha Road", address: "Vidhan Sabha Marg, Hazratganj, Lucknow 226001", city: "Lucknow", state: "Uttar Pradesh", blends: ["E20", "E100", "E85"], operator: "IOCL", lat: 26.8488, lng: 80.9462, open24h: true, source: "curated" },
+    { id: "l2", name: "BPCL Gomti Nagar Viram Khand", address: "Viram Khand 1, Gomti Nagar, Lucknow 226010", city: "Lucknow", state: "Uttar Pradesh", blends: ["E20", "E10"], operator: "BPCL", lat: 26.8469, lng: 80.9984, open24h: false, source: "curated" },
+    { id: "l3", name: "HPCL Alambagh Bus Stand", address: "Kanpur Road, Alambagh, Lucknow 226005", city: "Lucknow", state: "Uttar Pradesh", blends: ["E20"], operator: "HPCL", lat: 26.8103, lng: 80.9113, open24h: true, source: "curated" },
+    { id: "l4", name: "IOCL Indira Nagar Faizabad Road", address: "Faizabad Road, Indira Nagar, Lucknow 226016", city: "Lucknow", state: "Uttar Pradesh", blends: ["E20", "E85"], operator: "IOCL", lat: 26.8832, lng: 81.0011, open24h: false, source: "curated" },
   ],
   Jaipur: [
-    { id: "j1", name: "IOCL MI Road Gandhi Nagar", address: "MI Road, Gandhi Nagar, Jaipur 302015", city: "Jaipur", state: "Rajasthan", blends: ["E20", "E10"], operator: "IOCL", lat: 26.9186, lng: 75.7952, open24h: true },
-    { id: "j2", name: "BPCL Vaishali Nagar", address: "Vaishali Nagar, Jaipur 302021", city: "Jaipur", state: "Rajasthan", blends: ["E20", "E85"], operator: "BPCL", lat: 26.9338, lng: 75.7412, open24h: false },
-    { id: "j3", name: "HPCL Malviya Nagar JLN Road", address: "JLN Road, Malviya Nagar, Jaipur 302017", city: "Jaipur", state: "Rajasthan", blends: ["E20"], operator: "HPCL", lat: 26.8584, lng: 75.8073, open24h: true },
-    { id: "j4", name: "IOCL Mansarovar Vidhyadhar Nagar", address: "Vidhyadhar Nagar, Mansarovar, Jaipur 302020", city: "Jaipur", state: "Rajasthan", blends: ["E20"], operator: "IOCL", lat: 26.8607, lng: 75.7627, open24h: false },
+    { id: "j1", name: "IOCL MI Road Gandhi Nagar", address: "MI Road, Gandhi Nagar, Jaipur 302015", city: "Jaipur", state: "Rajasthan", blends: ["E20", "E10"], operator: "IOCL", lat: 26.9186, lng: 75.7952, open24h: true, source: "curated" },
+    { id: "j2", name: "BPCL Vaishali Nagar", address: "Vaishali Nagar, Jaipur 302021", city: "Jaipur", state: "Rajasthan", blends: ["E20", "E85"], operator: "BPCL", lat: 26.9338, lng: 75.7412, open24h: false, source: "curated" },
+    { id: "j3", name: "HPCL Malviya Nagar JLN Road", address: "JLN Road, Malviya Nagar, Jaipur 302017", city: "Jaipur", state: "Rajasthan", blends: ["E20"], operator: "HPCL", lat: 26.8584, lng: 75.8073, open24h: true, source: "curated" },
+    { id: "j4", name: "IOCL Mansarovar Vidhyadhar Nagar", address: "Vidhyadhar Nagar, Mansarovar, Jaipur 302020", city: "Jaipur", state: "Rajasthan", blends: ["E20"], operator: "IOCL", lat: 26.8607, lng: 75.7627, open24h: false, source: "curated" },
   ],
   Chandigarh: [
-    { id: "ch1", name: "IOCL Sector 17 Plaza", address: "Sector 17 B, Chandigarh 160017", city: "Chandigarh", state: "Chandigarh", blends: ["E20", "E10"], operator: "IOCL", lat: 30.7411, lng: 76.7879, open24h: true },
-    { id: "ch2", name: "BPCL Sector 34 Phase", address: "Sector 34 A, Chandigarh 160022", city: "Chandigarh", state: "Chandigarh", blends: ["E20", "E85"], operator: "BPCL", lat: 30.7218, lng: 76.7897, open24h: false },
-    { id: "ch3", name: "HPCL Mohali Phase 10", address: "Phase 10, Mohali, Punjab 160062", city: "Chandigarh", state: "Punjab", blends: ["E20"], operator: "HPCL", lat: 30.7046, lng: 76.7179, open24h: true },
+    { id: "ch1", name: "IOCL Sector 17 Plaza", address: "Sector 17 B, Chandigarh 160017", city: "Chandigarh", state: "Chandigarh", blends: ["E20", "E10"], operator: "IOCL", lat: 30.7411, lng: 76.7879, open24h: true, source: "curated" },
+    { id: "ch2", name: "BPCL Sector 34 Phase", address: "Sector 34 A, Chandigarh 160022", city: "Chandigarh", state: "Chandigarh", blends: ["E20", "E85"], operator: "BPCL", lat: 30.7218, lng: 76.7897, open24h: false, source: "curated" },
+    { id: "ch3", name: "HPCL Mohali Phase 10", address: "Phase 10, Mohali, Punjab 160062", city: "Chandigarh", state: "Punjab", blends: ["E20"], operator: "HPCL", lat: 30.7046, lng: 76.7179, open24h: true, source: "curated" },
   ],
   Nagpur: [
-    { id: "n1", name: "IOCL Sitabuldi Main Road", address: "Main Road, Sitabuldi, Nagpur 440012", city: "Nagpur", state: "Maharashtra", blends: ["E20", "E85", "E10"], operator: "IOCL", lat: 21.1517, lng: 79.0820, open24h: true },
-    { id: "n2", name: "BPCL Dharampeth VCA Ground", address: "VCA Ground Road, Dharampeth, Nagpur 440010", city: "Nagpur", state: "Maharashtra", blends: ["E20"], operator: "BPCL", lat: 21.1497, lng: 79.0618, open24h: false },
-    { id: "n3", name: "HPCL Hingna MIDC Road", address: "MIDC Road, Hingna, Nagpur 440016", city: "Nagpur", state: "Maharashtra", blends: ["E20"], operator: "HPCL", lat: 21.1014, lng: 79.0113, open24h: true },
+    { id: "n1", name: "IOCL Sitabuldi Main Road", address: "Main Road, Sitabuldi, Nagpur 440012", city: "Nagpur", state: "Maharashtra", blends: ["E20", "E85", "E10"], operator: "IOCL", lat: 21.1517, lng: 79.0820, open24h: true, source: "curated" },
+    { id: "n2", name: "BPCL Dharampeth VCA Ground", address: "VCA Ground Road, Dharampeth, Nagpur 440010", city: "Nagpur", state: "Maharashtra", blends: ["E20"], operator: "BPCL", lat: 21.1497, lng: 79.0618, open24h: false, source: "curated" },
+    { id: "n3", name: "HPCL Hingna MIDC Road", address: "MIDC Road, Hingna, Nagpur 440016", city: "Nagpur", state: "Maharashtra", blends: ["E20"], operator: "HPCL", lat: 21.1014, lng: 79.0113, open24h: true, source: "curated" },
   ],
   Indore: [
-    { id: "in1", name: "IOCL Vijay Nagar Square", address: "Vijay Nagar Square, Indore 452010", city: "Indore", state: "Madhya Pradesh", blends: ["E20", "E85", "E10"], operator: "IOCL", lat: 22.7435, lng: 75.8853, open24h: true },
-    { id: "in2", name: "BPCL Scheme 54 AB Road", address: "AB Road, Scheme 54, Indore 452010", city: "Indore", state: "Madhya Pradesh", blends: ["E20"], operator: "BPCL", lat: 22.7515, lng: 75.9030, open24h: false },
-    { id: "in3", name: "HPCL LIG Colony Square", address: "LIG Colony, Indore 452001", city: "Indore", state: "Madhya Pradesh", blends: ["E20"], operator: "HPCL", lat: 22.7143, lng: 75.8560, open24h: true },
+    { id: "in1", name: "IOCL Vijay Nagar Square", address: "Vijay Nagar Square, Indore 452010", city: "Indore", state: "Madhya Pradesh", blends: ["E20", "E85", "E10"], operator: "IOCL", lat: 22.7435, lng: 75.8853, open24h: true, source: "curated" },
+    { id: "in2", name: "BPCL Scheme 54 AB Road", address: "AB Road, Scheme 54, Indore 452010", city: "Indore", state: "Madhya Pradesh", blends: ["E20"], operator: "BPCL", lat: 22.7515, lng: 75.9030, open24h: false, source: "curated" },
+    { id: "in3", name: "HPCL LIG Colony Square", address: "LIG Colony, Indore 452001", city: "Indore", state: "Madhya Pradesh", blends: ["E20"], operator: "HPCL", lat: 22.7143, lng: 75.8560, open24h: true, source: "curated" },
   ],
   Bhopal: [
-    { id: "bp1", name: "IOCL Arera Colony Zone 1", address: "Zone 1, Arera Colony, Bhopal 462016", city: "Bhopal", state: "Madhya Pradesh", blends: ["E20", "E10"], operator: "IOCL", lat: 23.2034, lng: 77.4343, open24h: true },
-    { id: "bp2", name: "BPCL MP Nagar Zone 1", address: "Zone 1, MP Nagar, Bhopal 462011", city: "Bhopal", state: "Madhya Pradesh", blends: ["E20"], operator: "BPCL", lat: 23.2320, lng: 77.4238, open24h: false },
-    { id: "bp3", name: "HPCL Kolar Road", address: "Kolar Road, Bhopal 462042", city: "Bhopal", state: "Madhya Pradesh", blends: ["E20", "E85"], operator: "HPCL", lat: 23.2106, lng: 77.4661, open24h: true },
+    { id: "bp1", name: "IOCL Arera Colony Zone 1", address: "Zone 1, Arera Colony, Bhopal 462016", city: "Bhopal", state: "Madhya Pradesh", blends: ["E20", "E10"], operator: "IOCL", lat: 23.2034, lng: 77.4343, open24h: true, source: "curated" },
+    { id: "bp2", name: "BPCL MP Nagar Zone 1", address: "Zone 1, MP Nagar, Bhopal 462011", city: "Bhopal", state: "Madhya Pradesh", blends: ["E20"], operator: "BPCL", lat: 23.2320, lng: 77.4238, open24h: false, source: "curated" },
+    { id: "bp3", name: "HPCL Kolar Road", address: "Kolar Road, Bhopal 462042", city: "Bhopal", state: "Madhya Pradesh", blends: ["E20", "E85"], operator: "HPCL", lat: 23.2106, lng: 77.4661, open24h: true, source: "curated" },
   ],
 };
 
@@ -426,8 +428,8 @@ async function fetchOCMStations(lat: number, lng: number, distKm: number, countr
   const url = `https://api.openchargemap.io/v3/poi/?output=json&latitude=${lat}&longitude=${lng}&distance=${distKm}&maxresults=100&distanceunit=KM&verbose=false${cc}${connId}`;
   
   const headers: HeadersInit = {};
-  const apiKey = import.meta.env.VITE_OCM_API_KEY || "YOUR_DUMMY_KEY_HERE";
-  if (apiKey) headers["X-API-Key"] = apiKey;
+  const apiKey = import.meta.env.VITE_OCM_API_KEY;
+  if (apiKey && apiKey !== "YOUR_DUMMY_KEY_HERE") headers["X-API-Key"] = apiKey;
 
   const res = await fetch(url, { headers });
   if (!res.ok) throw new Error("API error");
@@ -441,9 +443,36 @@ async function fetchOCMStations(lat: number, lng: number, distKm: number, countr
   return arr;
 }
 
-async function geocodeSearch(query: string): Promise<GeoResult[]> {
+async function fetchLiveFuelStations(lat: number, lng: number, radiusKm: number): Promise<EthanolStation[]> {
+  const radiusMeters = Math.max(2000, Math.round(radiusKm * 1000));
+  const query = `[out:json][timeout:10];node["amenity"="fuel"](around:${radiusMeters},${lat},${lng});out body;`;
+  const url = "https://overpass-api.de/api/interpreter";
+  try {
+    const res = await fetch(url, { method: "POST", body: query });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.elements || []).map((el: any) => ({
+      id: "op_" + el.id,
+      name: el.tags?.name || el.tags?.brand || "Fuel Station",
+      address: [el.tags?.["addr:street"], el.tags?.["addr:city"]].filter(Boolean).join(", ") || "Unknown Address",
+      city: el.tags?.["addr:city"] || "",
+      state: el.tags?.["addr:state"] || "",
+      blends: [],
+      operator: el.tags?.operator || el.tags?.brand || "Unknown",
+      lat: el.lat,
+      lng: el.lon,
+      open24h: el.tags?.opening_hours === "24/7",
+      source: "live" as const
+    }));
+  } catch (e) {
+    return [];
+  }
+}
+
+async function geocodeSearch(query: string, countryCode: string): Promise<GeoResult[]> {
   if (query.length < 2) return [];
-  const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=6`, { headers: { "Accept-Language": "en", "User-Agent": "ChargeIQ/1.0" } });
+  const cc = countryCode ? `&countrycodes=${countryCode.toLowerCase()}` : "";
+  const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=6${cc}`, { headers: { "Accept-Language": "en", "User-Agent": "ChargeIQ/1.0" } });
   return res.json();
 }
 
@@ -566,6 +595,12 @@ export default function App() {
   const [ethanolCity, setEthanolCity] = useState("Delhi");
   const [blendFilter, setBlendFilter] = useState("All");
   const [activeEthStation, setActiveEthStation] = useState<string | null>(null);
+  const [ethanolStations, setEthanolStations] = useState<EthanolStation[]>([]);
+  const [ethFetching, setEthFetching] = useState(false);
+
+  // Community Reports State
+  const [stationStats, setStationStats] = useState<Record<string, { working: number, broken: number }>>({});
+  const [submittingReport, setSubmittingReport] = useState<string | null>(null);
 
   // Search
   const [cityQuery, setCityQuery] = useState("");
@@ -614,7 +649,7 @@ export default function App() {
     .sort((a, b) => (a.AddressInfo.Distance || 999) - (b.AddressInfo.Distance || 999));
 
   const filteredEth = (() => {
-    const all = ETHANOL_PUMPS[ethanolCity] || [];
+    const all = ethanolStations;
     const base = blendFilter === "All" ? all : all.filter((p) => p.blends.includes(blendFilter));
     if (userLoc && isInIndia(userLoc.lat, userLoc.lng)) {
       return [...base].sort((a, b) => haversineKm(userLoc.lat, userLoc.lng, a.lat, a.lng) - haversineKm(userLoc.lat, userLoc.lng, b.lat, b.lng));
@@ -668,7 +703,7 @@ export default function App() {
     if (!leafletRef.current) return;
     const map = leafletRef.current;
     
-    const index = new Supercluster({ radius: 50, maxZoom: 15 });
+    const index = new Supercluster({ radius: 35, maxZoom: 16 });
     
     const points: any[] = [];
     if (fuelMode === "ev") {
@@ -748,16 +783,37 @@ export default function App() {
     };
   }, [fuelMode, filteredEV, filteredEth]);
 
-  const handleCountryChange = useCallback((country: Country) => {
-    setSelectedCountry(country);
-    setCountryDropOpen(false);
-    setMapAction({ lat: country.defaultCenter[0], lng: country.defaultCenter[1], zoom: country.defaultZoom });
-    setEvStations([]);
-    setStep("initial");
-    setConnFilter("All");
-    setCityQuery("");
-    if (!country.hasEthanol && fuelMode === "ethanol") setFuelMode("ev");
-  }, [fuelMode]);
+  // Handle fetching station reports when filtered list changes
+  useEffect(() => {
+    const ids = fuelMode === "ev" ? filteredEV.map(s => s.ID.toString()) : filteredEth.map(s => s.id);
+    if (ids.length > 0) {
+      fetchStationStats(ids).then(stats => setStationStats(prev => ({ ...prev, ...stats })));
+    }
+  }, [fuelMode, filteredEV, filteredEth]);
+
+  // Handle reporting a station
+  const handleReport = async (e: React.MouseEvent, stationId: string, isWorking: boolean) => {
+    e.stopPropagation();
+    setSubmittingReport(stationId);
+    try {
+      await submitStationReport(stationId, isWorking);
+      // Optimistically update state
+      setStationStats(prev => {
+        const current = prev[stationId] || { working: 0, broken: 0 };
+        return {
+          ...prev,
+          [stationId]: {
+            working: current.working + (isWorking ? 1 : 0),
+            broken: current.broken + (isWorking ? 0 : 1)
+          }
+        };
+      });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSubmittingReport(null);
+    }
+  };
 
   const loadEVStations = useCallback(async (lat: number, lng: number, dist: number, cc?: string, cf?: string) => {
     setEvFetching(true);
@@ -765,6 +821,43 @@ export default function App() {
     catch { setEvStations([]); }
     finally { setEvFetching(false); }
   }, []);
+
+  const loadLiveFuelStations = useCallback(async (lat: number, lng: number, dist: number) => {
+    setEthFetching(true);
+    try {
+      const live = await fetchLiveFuelStations(lat, lng, dist);
+      const curated = Object.values(ETHANOL_PUMPS).flat();
+      const merged = live.map(ls => {
+        const match = curated.find(cs => haversineKm(ls.lat, ls.lng, cs.lat, cs.lng) < 0.15);
+        if (match) return { ...ls, ...match, id: ls.id, source: "curated" as const };
+        return ls;
+      });
+      setEthanolStations(merged);
+    } catch {
+      setEthanolStations([]);
+    } finally {
+      setEthFetching(false);
+    }
+  }, []);
+
+  const handleCountryChange = useCallback((country: Country) => {
+    setSelectedCountry(country);
+    setCountryDropOpen(false);
+    const [lat, lng] = country.defaultCenter;
+    setMapAction({ lat, lng, zoom: country.defaultZoom });
+    setStep("loaded");
+    setConnFilter("All");
+    setCityQuery("");
+    
+    if (!country.hasEthanol && fuelMode === "ethanol") {
+      setFuelMode("ev");
+      loadEVStations(lat, lng, distKm, country.code);
+    } else if (fuelMode === "ev") {
+      loadEVStations(lat, lng, distKm, country.code);
+    } else {
+      loadLiveFuelStations(lat, lng, distKm);
+    }
+  }, [fuelMode, distKm, loadEVStations, loadLiveFuelStations]);
 
   const requestGPS = useCallback(() => {
     setStep("requesting");
@@ -777,11 +870,7 @@ export default function App() {
         if (fuelMode === "ev") {
           loadEVStations(lat, lng, distKm, selectedCountry.code, connFilter);
         } else {
-          if (isInIndia(lat, lng)) {
-            const city = nearestEthCity(lat, lng);
-            setEthanolCity(city);
-            setMapAction({ lat: ETHANOL_CITY_CENTERS[city][0], lng: ETHANOL_CITY_CENTERS[city][1], zoom: 13 });
-          }
+          loadLiveFuelStations(lat, lng, distKm);
         }
         reverseGeocode(lat, lng).then(setLocationLabel);
       },
@@ -801,19 +890,15 @@ export default function App() {
     if (fuelMode === "ev") {
       loadEVStations(lat, lng, distKm, selectedCountry.code, connFilter);
     } else {
-      if (isInIndia(lat, lng)) {
-        const city = nearestEthCity(lat, lng);
-        setEthanolCity(city);
-        setMapAction({ lat: ETHANOL_CITY_CENTERS[city][0], lng: ETHANOL_CITY_CENTERS[city][1], zoom: 13 });
-      }
+      loadLiveFuelStations(lat, lng, distKm);
     }
-  }, [fuelMode, distKm, loadEVStations, connFilter, selectedCountry]);
+  }, [fuelMode, distKm, loadEVStations, loadLiveFuelStations, connFilter, selectedCountry]);
 
   const handleCityInput = (val: string) => {
     setCityQuery(val);
     if (searchTimer.current) clearTimeout(searchTimer.current);
     if (val.length < 2) { setGeoResults([]); return; }
-    searchTimer.current = setTimeout(async () => setGeoResults(await geocodeSearch(val)), 350);
+    searchTimer.current = setTimeout(async () => setGeoResults(await geocodeSearch(val, selectedCountry.code)), 350);
   };
 
   const selectEthCity = (city: string) => {
@@ -823,6 +908,7 @@ export default function App() {
     const [lat, lng] = ETHANOL_CITY_CENTERS[city];
     setMapAction({ lat, lng, zoom: 13 });
     if (step !== "loaded") setStep("loaded");
+    loadLiveFuelStations(lat, lng, distKm);
   };
 
   const changeDistance = (km: number) => {
@@ -837,6 +923,7 @@ export default function App() {
       const [lat, lng] = ETHANOL_CITY_CENTERS[ethanolCity];
       setMapAction({ lat, lng, zoom: 13 });
       if (step !== "loaded") setStep("loaded");
+      loadLiveFuelStations(lat, lng, distKm);
     } else if (userLoc) {
       setMapAction({ lat: userLoc.lat, lng: userLoc.lng, zoom: 14 });
     }
@@ -992,7 +1079,7 @@ export default function App() {
         <PriceTicker city={priceCity} prices={currentPrices} symbol={currencySymbol} />
 
         {/* ── Left Panel + Map row ── */}
-        <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
+        <div className="flex flex-col-reverse lg:flex-row flex-1 min-h-0 overflow-hidden">
 
         {/* ── Left Panel ── */}
         <div className="flex flex-col bg-background border-r border-border w-full h-[46vh] lg:w-[390px] lg:h-auto lg:flex-none overflow-hidden">
@@ -1189,9 +1276,19 @@ export default function App() {
                                 </div>
                                 {isPopular && <span className="text-[9px] font-mono text-orange-400">{pts} points · Popular</span>}
                               </div>
-                              <a href={mapsUrl(s.AddressInfo.Latitude, s.AddressInfo.Longitude)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-[10px] font-mono text-muted-foreground hover:text-primary transition-colors flex items-center gap-0.5">
-                                Directions <ExternalLink className="w-2.5 h-2.5" />
-                              </a>
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 mr-2">
+                                  <button onClick={(e) => handleReport(e, s.ID.toString(), true)} disabled={submittingReport === s.ID.toString()} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-green-400 transition-colors disabled:opacity-50">
+                                    <ThumbsUp className="w-3 h-3" /> {stationStats[s.ID]?.working || 0}
+                                  </button>
+                                  <button onClick={(e) => handleReport(e, s.ID.toString(), false)} disabled={submittingReport === s.ID.toString()} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-red-400 transition-colors disabled:opacity-50">
+                                    <ThumbsDown className="w-3 h-3" /> {stationStats[s.ID]?.broken || 0}
+                                  </button>
+                                </div>
+                                <a href={mapsUrl(s.AddressInfo.Latitude, s.AddressInfo.Longitude)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-[10px] font-mono text-muted-foreground hover:text-primary transition-colors flex items-center gap-0.5">
+                                  Directions <ExternalLink className="w-2.5 h-2.5" />
+                                </a>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1233,18 +1330,28 @@ export default function App() {
                             {blendPrice && <span className="text-[10px] font-mono font-bold ml-auto" style={{ color: col }}>₹{blendPrice}/L</span>}
                           </div>
                           <div className="flex items-center justify-between mt-1.5">
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.open24h ? "#4ADE80" : "#7A828E" }} />
-                                <span className="text-[10px] font-mono" style={{ color: s.open24h ? "#4ADE80" : "#7A828E" }}>{s.open24h ? "Open 24h" : "Check timing"}</span>
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: s.open24h ? "#4ADE80" : "#7A828E" }} />
+                                  <span className="text-[10px] font-mono" style={{ color: s.open24h ? "#4ADE80" : "#7A828E" }}>{s.open24h ? "Open 24h" : "Check timing"}</span>
+                                </div>
+                                {isPopular && <span className="text-[9px] font-mono text-orange-400">Most Used</span>}
                               </div>
-                              {isPopular && <span className="text-[9px] font-mono text-orange-400">Most Used</span>}
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 mr-2">
+                                  <button onClick={(e) => handleReport(e, s.id, true)} disabled={submittingReport === s.id} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-green-400 transition-colors disabled:opacity-50">
+                                    <ThumbsUp className="w-3 h-3" /> {stationStats[s.id]?.working || 0}
+                                  </button>
+                                  <button onClick={(e) => handleReport(e, s.id, false)} disabled={submittingReport === s.id} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-red-400 transition-colors disabled:opacity-50">
+                                    <ThumbsDown className="w-3 h-3" /> {stationStats[s.id]?.broken || 0}
+                                  </button>
+                                </div>
+                                <a href={mapsUrl(s.lat, s.lng)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-[10px] font-mono hover:underline flex items-center gap-0.5" style={{ color: col }}>
+                                  Directions <ExternalLink className="w-2.5 h-2.5" />
+                                </a>
+                              </div>
                             </div>
-                            <a href={mapsUrl(s.lat, s.lng)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-[10px] font-mono hover:underline flex items-center gap-0.5" style={{ color: col }}>
-                              Directions <ExternalLink className="w-2.5 h-2.5" />
-                            </a>
                           </div>
-                        </div>
                       </div>
                     </motion.div>
                   );
@@ -1255,7 +1362,7 @@ export default function App() {
         </div>
 
         {/* ── Map ── */}
-        <div className="flex-1 relative" style={{ minHeight: "54vh" }}>
+        <div className="flex-1 relative min-h-[40vh] lg:min-h-0">
           <div ref={mapDivRef} className="w-full h-full" style={{ background: "#0D1017" }} />
 
           {/* Welcome overlay */}

@@ -31,6 +31,7 @@ interface OCMStation {
   StatusType?: { IsOperational: boolean; Title: string } | null;
   OperatorInfo?: { Title: string } | null;
   UsageCost?: string | null;
+  NumberOfPoints?: number;
 }
 
 interface EthanolStation {
@@ -1238,7 +1239,7 @@ export default function App() {
                 <AnimatePresence mode="popLayout">
                   {filteredEV.map((s, i) => {
                     const conns = getConnectors(s); const power = getMaxPower(s);
-                    const op = isOperational(s); const dist = fmtDist(s.AddressInfo.Distance);
+                    const op = getStationStatus(s) === "operational"; const dist = fmtDist(s.AddressInfo.Distance);
                     const col = CONNECTOR_COLORS[conns[0]] || "#C2FF3D"; const isAct = activeEVStation === s.ID;
                     const pts = s.NumberOfPoints ?? 0;
                     const isPopular = pts >= 4;

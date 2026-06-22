@@ -4,8 +4,8 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite"
+    "build": "node node_modules/vite/bin/vite.js build",
+    "dev": "node node_modules/vite/bin/vite.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",

@@ -623,16 +623,16 @@ export default function App() {
   const [acOn, setAcOn] = useState(false);
 
   // Cost calc
-  const [elecPrice, setElecPrice] = useState(0.25);
-  const [petrolPrice, setPetrolPrice] = useState(1.8);
+  const [elecPrice, setElecPrice] = useState(COUNTRIES[0].fuelPrices.evHome);
+  const [petrolPrice, setPetrolPrice] = useState(COUNTRIES[0].fuelPrices.petrol);
   const [petrolEffic, setPetrolEffic] = useState(12);
   const [dailyKm, setDailyKm] = useState(50);
 
   // Flex-fuel calc
   const [baseMileage, setBaseMileage] = useState(18);
   const [dailyDriveKm, setDailyDriveKm] = useState(40);
-  const [petrolPriceINR, setPetrolPriceINR] = useState(105);
-  const [ethanolPriceINR, setEthanolPriceINR] = useState(65);
+  const [ethPetrolPrice, setEthPetrolPrice] = useState(COUNTRIES[0].fuelPrices.petrol);
+  const [ethBiofuelPrice, setEthBiofuelPrice] = useState(COUNTRIES[0].fuelPrices.e100 || 65);
   const [selectedBlend, setSelectedBlend] = useState("E20");
 
   useEffect(() => {
@@ -946,14 +946,14 @@ export default function App() {
 
   // Flex-fuel calc
   const blend = BLEND_INFO.find((b) => b.id === selectedBlend) || BLEND_INFO[0];
-  const blendCostPerL = petrolPriceINR + (ethanolPriceINR - petrolPriceINR) * (1 - blend.blendCostFactor);
+  const blendCostPerL = ethPetrolPrice + (ethBiofuelPrice - ethPetrolPrice) * (1 - blend.blendCostFactor);
   const effectiveMileage = baseMileage * (1 + blend.mileageAdj / 100);
-  const petrolCostPerKmINR = petrolPriceINR / baseMileage;
-  const blendCostPerKmINR = blendCostPerL / effectiveMileage;
-  const monthlySavingsINR = (petrolCostPerKmINR - blendCostPerKmINR) * dailyDriveKm * 30;
+  const petrolCostPerKmEth = ethPetrolPrice / baseMileage;
+  const blendCostPerKmEth = blendCostPerL / effectiveMileage;
+  const monthlySavings = (petrolCostPerKmEth - blendCostPerKmEth) * dailyDriveKm * 30;
   const co2SavedKgMonth = (blend.co2Save / 100) * (dailyDriveKm * 30 / baseMileage) * 2.392;
   const blendFraction = parseInt(selectedBlend.substring(1)) / 100;
-  const blendLiterCost = blendFraction * ethanolPriceINR + (1 - blendFraction) * petrolPriceINR;
+  const blendLiterCost = blendFraction * ethBiofuelPrice + (1 - blendFraction) * ethPetrolPrice;
 
   const showMap = step === "loaded" || step === "requesting" || fuelMode === "ethanol";
 
@@ -1408,13 +1408,13 @@ export default function App() {
           <Reveal>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-8 h-px opacity-70" style={{ background: "#4ADE80" }} />
-              <span className="text-[10px] font-mono tracking-[0.2em] uppercase opacity-80" style={{ color: "#4ADE80" }}>India Biofuel Mission</span>
+              <span className="text-[10px] font-mono tracking-[0.2em] uppercase opacity-80" style={{ color: "#4ADE80" }}>{selectedCountry.name} Biofuel Mission</span>
             </div>
             <h2 className="font-heading text-4xl sm:text-5xl font-bold leading-none tracking-tight text-foreground mb-3">
-              INDIA&apos;S ETHANOL<br /><span style={{ color: "#4ADE80" }}>REVOLUTION</span>
+              {selectedCountry.name.toUpperCase()}&apos;S ETHANOL<br /><span style={{ color: "#4ADE80" }}>REVOLUTION</span>
             </h2>
             <p className="text-sm text-muted-foreground max-w-xl leading-relaxed">
-              PM Modi&apos;s vision: 20% ethanol blending by 2025-26. India is now the world&apos;s 3rd largest ethanol producer. E20 is mandatory, E85 flex-fuel vehicles are on the road, E100 pilots are live.
+              {selectedCountry.code === "IN" ? "PM Modi's vision: 20% ethanol blending by 2025-26. India is now the world's 3rd largest ethanol producer. E20 is mandatory, E85 flex-fuel vehicles are on the road, E100 pilots are live." : `Biofuels are driving the future of sustainable transportation in ${selectedCountry.name}. Higher ethanol blends like E20, E50, and E100 drastically reduce CO₂ emissions and lower dependence on fossil fuels.`}
             </p>
 
             {/* Timeline chips */}
@@ -1492,8 +1492,8 @@ export default function App() {
                 {([
                   { label: "Your car's petrol mileage", unit: "km/L", val: baseMileage, set: setBaseMileage, min: 5, max: 35, step: 0.5, fmt: (v: number) => `${v} km/L` },
                   { label: "Daily drive", unit: "km/day", val: dailyDriveKm, set: setDailyDriveKm, min: 5, max: 200, step: 5, fmt: (v: number) => `${v} km` },
-                  { label: "Petrol price", unit: "₹/litre", val: petrolPriceINR, set: setPetrolPriceINR, min: 80, max: 130, step: 1, fmt: (v: number) => `₹${v}` },
-                  { label: "Ethanol price", unit: "₹/litre", val: ethanolPriceINR, set: setEthanolPriceINR, min: 45, max: 80, step: 1, fmt: (v: number) => `₹${v}` },
+                  { label: "Petrol price", unit: `${selectedCountry.symbol}/litre`, val: ethPetrolPrice, set: setEthPetrolPrice, min: 80, max: 130, step: 1, fmt: (v: number) => `${selectedCountry.symbol}${v.toFixed(1)}` },
+                  { label: "Ethanol price", unit: `${selectedCountry.symbol}/litre`, val: ethBiofuelPrice, set: setEthBiofuelPrice, min: 45, max: 80, step: 1, fmt: (v: number) => `${selectedCountry.symbol}${v.toFixed(1)}` },
                 ] as { label: string; unit: string; val: number; set: (v: number) => void; min: number; max: number; step: number; fmt: (v: number) => string }[]).map(({ label, unit, val, set, min, max, step, fmt }) => (
                   <div key={label}>
                     <div className="flex justify-between items-baseline mb-1.5">
@@ -1513,22 +1513,22 @@ export default function App() {
                 {/* Big savings */}
                 <div className="p-6 rounded-lg text-center" style={{ background: "linear-gradient(135deg, #181C22 0%, #0D1A0E 100%)", border: "1px solid rgba(74,222,128,0.2)" }}>
                   <div className="text-[10px] font-mono tracking-[0.2em] uppercase text-muted-foreground mb-2">Monthly Savings on {selectedBlend}</div>
-                  <motion.div key={Math.round(monthlySavingsINR)} className="font-heading text-6xl font-bold leading-none tabular-nums"
-                    style={{ color: monthlySavingsINR >= 0 ? "#4ADE80" : "#FF4D4D", textShadow: `0 0 40px ${monthlySavingsINR >= 0 ? "#4ADE8045" : "#FF4D4D45"}` }}
+                  <motion.div key={Math.round(monthlySavings)} className="font-heading text-6xl font-bold leading-none tabular-nums"
+                    style={{ color: monthlySavings >= 0 ? "#4ADE80" : "#FF4D4D", textShadow: `0 0 40px ${monthlySavings >= 0 ? "#4ADE8045" : "#FF4D4D45"}` }}
                     initial={{ scale: 0.92 }} animate={{ scale: 1 }} transition={{ duration: 0.2 }}>
-                    ₹{Math.abs(monthlySavingsINR).toFixed(0)}
+                    {selectedCountry.symbol}{Math.abs(monthlySavings).toFixed(0)}
                   </motion.div>
-                  <div className="text-xs font-mono text-muted-foreground mt-2">{monthlySavingsINR >= 0 ? `saved per month vs pure petrol` : "costs more than pure petrol"}</div>
+                  <div className="text-xs font-mono text-muted-foreground mt-2">{monthlySavings >= 0 ? `saved per month vs pure petrol` : "costs more than pure petrol"}</div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { label: `${selectedBlend} price/L`, val: `₹${blendLiterCost.toFixed(1)}`, col: BLEND_COLORS[selectedBlend] || "#4ADE80" },
+                    { label: `${selectedBlend} price/L`, val: `${selectedCountry.symbol}${blendLiterCost.toFixed(1)}`, col: BLEND_COLORS[selectedBlend] || "#4ADE80" },
                     { label: "Effective mileage", val: `${effectiveMileage.toFixed(1)} km/L`, col: "#4ADE80" },
-                    { label: "Annual savings", val: `₹${Math.abs(monthlySavingsINR * 12).toFixed(0)}`, col: "#4ADE80" },
+                    { label: "Annual savings", val: `${selectedCountry.symbol}${Math.abs(monthlySavings * 12).toFixed(0)}`, col: "#4ADE80" },
                     { label: "CO₂ saved / mo", val: `${co2SavedKgMonth.toFixed(1)} kg`, col: "#22C55E" },
-                    { label: `${selectedBlend} per km`, val: `₹${blendCostPerKmINR.toFixed(2)}`, col: BLEND_COLORS[selectedBlend] || "#4ADE80" },
-                    { label: "Petrol per km", val: `₹${petrolCostPerKmINR.toFixed(2)}`, col: "#FF8A3D" },
+                    { label: `${selectedBlend} per km`, val: `${selectedCountry.symbol}${blendCostPerKmEth.toFixed(2)}`, col: BLEND_COLORS[selectedBlend] || "#4ADE80" },
+                    { label: "Petrol per km", val: `${selectedCountry.symbol}${petrolCostPerKmEth.toFixed(2)}`, col: "#FF8A3D" },
                   ].map(({ label, val, col }) => (
                     <div key={label} className="px-4 py-3 rounded-md" style={{ background: "#181C22", border: "1px solid rgba(255,255,255,0.04)" }}>
                       <div className="text-[9px] font-mono uppercase tracking-[0.15em] text-muted-foreground">{label}</div>
@@ -1635,8 +1635,8 @@ export default function App() {
             <div className="grid lg:grid-cols-2 gap-8">
               <div className="space-y-6">
                 {([
-                  { label: "Electricity Price", unit: "USD / kWh", raw: elecPrice, set: setElecPrice, min: 0.05, max: 0.8, step: 0.01, fmt: (v: number) => `$${v.toFixed(2)}` },
-                  { label: "Petrol Price", unit: "USD / litre", raw: petrolPrice, set: setPetrolPrice, min: 0.5, max: 4, step: 0.05, fmt: (v: number) => `$${v.toFixed(2)}` },
+                  { label: "Electricity Price", unit: `${selectedCountry.currency} / kWh`, raw: elecPrice, set: setElecPrice, min: 0.05, max: 0.8, step: 0.01, fmt: (v: number) => `${selectedCountry.symbol}${v.toFixed(2)}` },
+                  { label: "Petrol Price", unit: `${selectedCountry.currency} / litre`, raw: petrolPrice, set: setPetrolPrice, min: 0.5, max: 4, step: 0.05, fmt: (v: number) => `${selectedCountry.symbol}${v.toFixed(2)}` },
                   { label: "Petrol Car Efficiency", unit: "km / litre", raw: petrolEffic, set: setPetrolEffic, min: 5, max: 25, step: 0.5, fmt: (v: number) => `${v} km/L` },
                   { label: "Daily Distance", unit: "km / day", raw: dailyKm, set: setDailyKm, min: 10, max: 300, step: 5, fmt: (v: number) => `${v} km` },
                 ] as { label: string; unit: string; raw: number; set: (v: number) => void; min: number; max: number; step: number; fmt: (v: number) => string }[]).map(({ label, unit, raw, set, min, max, step, fmt }) => (
@@ -1653,7 +1653,7 @@ export default function App() {
               <div className="space-y-4">
                 <div className="p-6 rounded-lg text-center" style={{ background: "linear-gradient(135deg,#181C22 0%,#0F1410 100%)", border: "1px solid rgba(194,255,61,0.18)" }}>
                   <div className="text-[10px] font-mono tracking-[0.2em] uppercase text-muted-foreground mb-3">Annual Savings</div>
-                  <motion.div key={Math.round(annualSavings)} className="font-heading text-6xl font-bold leading-none tabular-nums" style={{ color: annualSavings >= 0 ? "#C2FF3D" : "#FF4D4D", textShadow: annualSavings >= 0 ? "0 0 40px #C2FF3D45" : "0 0 40px #FF4D4D45" }} initial={{ scale: 0.92 }} animate={{ scale: 1 }} transition={{ duration: 0.2 }}>${Math.abs(annualSavings).toFixed(0)}</motion.div>
+                  <motion.div key={Math.round(annualSavings)} className="font-heading text-6xl font-bold leading-none tabular-nums" style={{ color: annualSavings >= 0 ? "#C2FF3D" : "#FF4D4D", textShadow: annualSavings >= 0 ? "0 0 40px #C2FF3D45" : "0 0 40px #FF4D4D45" }} initial={{ scale: 0.92 }} animate={{ scale: 1 }} transition={{ duration: 0.2 }}>{selectedCountry.symbol}{Math.abs(annualSavings).toFixed(0)}</motion.div>
                   <div className="text-xs font-mono text-muted-foreground mt-2">{annualSavings >= 0 ? "saved per year vs petrol" : "more expensive than petrol"}</div>
                 </div>
                 <div className="space-y-3">
@@ -1661,7 +1661,7 @@ export default function App() {
                     <div key={label} className="p-4 rounded-md" style={{ background: "#1A1E24", border: "1px solid rgba(255,255,255,0.04)" }}>
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-[10px] font-mono text-muted-foreground">{label}</span>
-                        <span className="font-heading text-xl font-bold" style={{ color }}>${val.toFixed(0)}</span>
+                        <span className="font-heading text-xl font-bold" style={{ color }}>{selectedCountry.symbol}{val.toFixed(0)}</span>
                       </div>
                       <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.05)" }}>
                         <motion.div className="h-full rounded-full" style={{ background: color }} animate={{ width: `${(val / maxMonthly) * 100}%` }} transition={{ duration: 0.35 }} />
@@ -1671,9 +1671,9 @@ export default function App() {
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { label: "EV per km", val: `$${evCostPerKm.toFixed(3)}`, color: "#C2FF3D" },
-                    { label: "Petrol per km", val: `$${petrolCostPerKm.toFixed(3)}`, color: "#FF8A3D" },
-                    { label: "Monthly savings", val: `$${Math.abs(petrolMonthly - evMonthly).toFixed(0)}`, color: "#C2FF3D" },
+                    { label: "EV per km", val: `${selectedCountry.symbol}${evCostPerKm.toFixed(3)}`, color: "#C2FF3D" },
+                    { label: "Petrol per km", val: `${selectedCountry.symbol}${petrolCostPerKm.toFixed(3)}`, color: "#FF8A3D" },
+                    { label: "Monthly savings", val: `${selectedCountry.symbol}${Math.abs(petrolMonthly - evMonthly).toFixed(0)}`, color: "#C2FF3D" },
                     { label: "CO₂ avoided/yr", val: `~${(dailyKm * 365 * 0.21 / 1000).toFixed(1)}t`, color: "#3DBAFF" },
                   ].map(({ label, val, color }) => (
                     <div key={label} className="px-4 py-3 rounded-md" style={{ background: "#1A1E24", border: "1px solid rgba(255,255,255,0.04)" }}>
